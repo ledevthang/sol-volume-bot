@@ -126,5 +126,9 @@ dist
 .yarn/cache
 .yarn/unplugged
 .yarn/build-state.yml
-.yarn/install-state.gz
+.yarn/install-state.gzk
 .pnp.*
+
+pnpm-lock.yaml
+yarn.lock
+package-lock.json

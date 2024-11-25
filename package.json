@@ -1,0 +1,31 @@
+{
+  "name": "sol-volume-bot",
+  "version": "1.0.0",
+  "description": "sol-volume-bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node --env-file=.env dist/main.js",
+    "release": "tsc --noEmit && rm -rf dist && swc --strip-leading-paths -d dist src",
+    "dev": "nodemon",
+    "type-check": "tsc --noEmit",
+    "lint": "biome lint --error-on-warnings ./src",
+    "format": "biome format ./src --fix",
+    "clean": "biome check ./src --write"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "@swc/cli": "^0.5.1",
+    "@swc/core": "^1.9.3",
+    "@types/node": "^22.9.3",
+    "nodemon": "^3.1.7",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "@solana/spl-token": "^0.4.9",
+    "@solana/web3.js": "^1.95.5",
+    "axios": "^1.7.7"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "watch": ["src"],
+  "ignore": ["src/**/*.test.ts"],
+  "ext": "ts,mjs,js,json,graphql",
+  "exec": "rm -rf dist && swc --strip-leading-paths -d dist src && node --env-file=.env dist/main.js",
+  "legacyWatch": true
+}

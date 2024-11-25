@@ -1,0 +1,8 @@
+{
+    "inputMint": "",
+    "outputMint": "",
+    "numberOfOrders": 2,
+    "minQuantity": 0.001,
+    "maxQuantity": 0.01,
+    "interval": 15000
+}
