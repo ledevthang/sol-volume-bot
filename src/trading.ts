@@ -12,6 +12,7 @@ import {
 	sendAndConfirmTransaction
 } from "@solana/web3.js"
 import axios from "axios"
+import { connection, owner } from "./config.js"
 import type { SwapCompute, SwapParams } from "./types.js"
 
 const fetchTokenAccountData = async (
@@ -39,8 +40,7 @@ const fetchTokenAccountData = async (
 }
 
 export const apiSwap = async (swapParams: SwapParams) => {
-	const { connection, owner, inputMint, outputMint, amountIn, slippage } =
-		swapParams
+	const { inputMint, outputMint, amountIn, slippage } = swapParams
 
 	const txVersion: string = "LEGACY" // or LEGACY
 	const isV0Tx = txVersion === "V0"
