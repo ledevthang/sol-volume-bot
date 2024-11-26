@@ -1,3 +1,5 @@
+import { type Keypair } from "@solana/web3.js"
+
 export type VolumeBotConfig = {
 	inputMint: string
 	outputMint: string
@@ -10,6 +12,7 @@ export type VolumeBotConfig = {
 }
 
 export type SwapParams = {
+	owner: Keypair,
 	inputMint: string
 	outputMint: string
 	amountIn: number //
