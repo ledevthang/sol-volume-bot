@@ -1,15 +1,12 @@
-import { NATIVE_MINT } from "@solana/spl-token"
-import { owner } from "./config.js"
-import { apiSwap } from "./trading.js"
+import { parseConfig } from "./config.js"
+import { Program } from "./program.js"
 
 async function main() {
-	await apiSwap({
-		owner,
-		inputMint: NATIVE_MINT.toBase58(),
-		outputMint: "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
-		amountIn: 100,
-		slippage: 0.5
-	})
+	const { connection, owner, config } = parseConfig()
+
+	const program = new Program(connection, owner, config)
+
+	await program.run()
 }
 
 main()

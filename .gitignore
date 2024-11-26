@@ -134,3 +134,7 @@ yarn.lock
 package-lock.json
 
 .DS_Store
+
+# 
+wallets.txt
+executing-wallets.txt

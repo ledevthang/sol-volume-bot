@@ -15,7 +15,7 @@ export type SwapParams = {
 	owner: Keypair
 	inputMint: string
 	outputMint: string
-	amountIn: number //
+	amountIn: bigint //
 	slippage: number // 0.5 => 0.5%
 }
 

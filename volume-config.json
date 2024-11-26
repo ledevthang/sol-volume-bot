@@ -1,10 +1,8 @@
 {
-    "inputMint": "",
-    "outputMint": "",
-    "numberOfTradesPerWallet": 2,
-    "initTokensPerWallet": 0.001,
-    "initSolPerWallet": 0.01,
-    "interval": 15000,
-    "amountTransferPercent": 99,
-    "walletsConcurrency": 3
+	"mint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+	"numberOfTradesPerWallet": 2,
+	"initTokensPerWallet": 0.001,
+	"initSolPerWallet": 0.001,
+	"amountTransferPercent": 95,
+	"walletsConcurrency": 1
 }
