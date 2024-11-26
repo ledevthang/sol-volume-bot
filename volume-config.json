@@ -1,8 +1,10 @@
 {
     "inputMint": "",
     "outputMint": "",
-    "numberOfOrders": 2,
-    "minQuantity": 0.001,
-    "maxQuantity": 0.01,
-    "interval": 15000
+    "numberOfTradesPerWallet": 2,
+    "initTokensPerWallet": 0.001,
+    "initSolPerWallet": 0.01,
+    "interval": 15000,
+    "amountTransferPercent": 99,
+    "walletsConcurrency": 3
 }

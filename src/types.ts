@@ -1,10 +1,12 @@
 export type VolumeBotConfig = {
 	inputMint: string
 	outputMint: string
-	numberOfOrders: number
-	minQuantity: number
-	maxQuantity: number
-	interval: number
+	numberOfTradesPerWallet: number
+	initTokensPerWallet: number
+	initSolPerWallet: number
+	interval: number // elapse time after each trade
+    amountTransferPercent: number
+    walletsConcurrency: number
 }
 
 export type SwapParams = {
