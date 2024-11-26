@@ -12,7 +12,6 @@ import {
 	sendAndConfirmTransaction
 } from "@solana/web3.js"
 import axios from "axios"
-import { connection } from "./config.js"
 import type { SwapCompute, SwapParams } from "./types.js"
 
 const fetchTokenAccountData = async (
@@ -39,7 +38,12 @@ const fetchTokenAccountData = async (
 	return tokenAccountData
 }
 
-export const apiSwap = async (swapParams: SwapParams) => {
+export const apiSwap = async (
+	connection: Connection,
+	swapParams: SwapParams
+) => {
+	console.log("swapParams: ", swapParams)
+
 	const { owner, inputMint, outputMint, amountIn, slippage } = swapParams
 
 	const txVersion: string = "LEGACY" // or LEGACY
@@ -78,12 +82,10 @@ export const apiSwap = async (swapParams: SwapParams) => {
 	const { data: swapResponse } = await axios.get<SwapCompute>(
 		`${
 			API_URLS.SWAP_HOST
-		}/compute/swap-base-in?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountIn}&slippageBps=${
+		}/compute/swap-base-in?inputMint=${inputMint}&outputMint=${outputMint}&amount=${amountIn.toString()}&slippageBps=${
 			slippage * 100
 		}&txVersion=${txVersion}`
 	)
-
-	console.log("swapResponse", swapResponse)
 
 	const { data: swapTransactions } = await axios.post<{
 		id: string
@@ -107,8 +109,6 @@ export const apiSwap = async (swapParams: SwapParams) => {
 	const allTransactions = allTxBuf.map(txBuf =>
 		isV0Tx ? VersionedTransaction.deserialize(txBuf) : Transaction.from(txBuf)
 	)
-
-	console.log(`total ${allTransactions.length} transactions`, swapTransactions)
 
 	let idx = 0
 	if (!isV0Tx) {

@@ -1,4 +1,4 @@
-import { type Keypair } from "@solana/web3.js"
+import type { Keypair } from "@solana/web3.js"
 
 export type VolumeBotConfig = {
 	inputMint: string
@@ -7,15 +7,15 @@ export type VolumeBotConfig = {
 	initTokensPerWallet: number
 	initSolPerWallet: number
 	interval: number // elapse time after each trade
-    amountTransferPercent: number
-    walletsConcurrency: number
+	amountTransferPercent: number
+	walletsConcurrency: number
 }
 
 export type SwapParams = {
-	owner: Keypair,
+	owner: Keypair
 	inputMint: string
 	outputMint: string
-	amountIn: number //
+	amountIn: bigint //
 	slippage: number // 0.5 => 0.5%
 }
 
