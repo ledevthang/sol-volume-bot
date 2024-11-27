@@ -1,8 +1,9 @@
 {
 	"mint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
 	"numberOfTradesPerWallet": 2,
-	"initTokensPerWallet": 0.001,
+	"initTokensPerWallet": 0.01,
 	"initSolPerWallet": 0.001,
 	"amountTransferPercent": 95,
-	"walletsConcurrency": 1
+	"walletsConcurrency": 1,
+	"slippage": 3
 }

@@ -25,9 +25,7 @@ export class Program {
 		private connection: web3.Connection,
 		private owner: web3.Keypair,
 		private config: Config
-	) {
-		console.log("config: ", this.config)
-	}
+	) {}
 
 	async run() {
 		let subAccounts = await this.generateAccounts(
@@ -64,10 +62,11 @@ export class Program {
 				if (result.status === "fulfilled") subAccounts.push(result.value)
 			}
 
-			if (subAccounts.length > 0)
+			if (subAccounts.length > 0) {
 				console.log(
 					`switch to new accounts ${subAccounts.map(account => account.account.publicKey.toBase58())}`
 				)
+			}
 		}
 	}
 
@@ -160,13 +159,12 @@ export class Program {
 
 		await web3.sendAndConfirmTransaction(this.connection, transaction, [sender])
 
-		console.log("tokenAmount: ", tokenAmount)
-
 		console.log(
 			`${sender.publicKey} transfered `,
 			formatSol(lamports),
 			` sols to ${receiver.publicKey}`
 		)
+
 		console.log(
 			`${sender.publicKey} transfered `,
 			formatToken(tokenAmount),
@@ -175,7 +173,7 @@ export class Program {
 	}
 
 	private async getBalanceAndTokenBalance(pubkey: web3.PublicKey) {
-		const balance = await this.connection.getBalance(pubkey)
+		const balance = await this.connection.getBalance(pubkey, "finalized")
 
 		const ataAddress = await spl.getAssociatedTokenAddress(
 			this.config.mint,
@@ -264,7 +262,7 @@ export class Program {
 			inputMint: inMint.toBase58(),
 			outputMint: outMint.toBase58(),
 			amountIn: amount,
-			slippage: 0.5
+			slippage: this.config.slippage
 		})
 
 		subAccount.tradingTimes++

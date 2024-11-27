@@ -14,6 +14,7 @@ export type Config = {
 	initSolPerWallet: bigint
 	amountTransferPercent: number
 	walletsConcurrency: number
+	slippage: number
 }
 
 export function parseConfig() {
@@ -34,7 +35,8 @@ export function parseConfig() {
 			.positive()
 			.transform(val => BigInt(val * 1_000_000)),
 		amountTransferPercent: z.number().positive(),
-		walletsConcurrency: z.number().int().positive().min(1)
+		walletsConcurrency: z.number().int().positive().min(1),
+		slippage: z.number().positive()
 	})
 
 	const { RPC_URL, WALLET } = envSchema.parse(process.env)

@@ -42,8 +42,6 @@ export const apiSwap = async (
 	connection: Connection,
 	swapParams: SwapParams
 ) => {
-	console.log("swapParams: ", swapParams)
-
 	const { owner, inputMint, outputMint, amountIn, slippage } = swapParams
 
 	const txVersion: string = "LEGACY" // or LEGACY
