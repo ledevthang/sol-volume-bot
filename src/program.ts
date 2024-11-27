@@ -24,7 +24,8 @@ export class Program {
 	constructor(
 		private connection: web3.Connection,
 		private owner: web3.Keypair,
-		private config: Config
+		private config: Config,
+		private decimals: number
 	) {}
 
 	async run() {
@@ -167,13 +168,13 @@ export class Program {
 
 		console.log(
 			`${sender.publicKey} transfered `,
-			formatToken(tokenAmount),
+			formatToken(tokenAmount, this.decimals),
 			` tokens to ${receiver.publicKey}`
 		)
 	}
 
 	private async getBalanceAndTokenBalance(pubkey: web3.PublicKey) {
-		const balance = await this.connection.getBalance(pubkey, "finalized")
+		const balance = await this.connection.getBalance(pubkey)
 
 		const ataAddress = await spl.getAssociatedTokenAddress(
 			this.config.mint,
@@ -197,12 +198,14 @@ export class Program {
 		const balanceInUsd = Number(formatSol(balance)) * nativePriceInUSD
 
 		const tokenBalanceInUsd =
-			Number(formatToken(tokenBalance)) * tokenPriceInUSD
+			Number(formatToken(tokenBalance, this.decimals)) * tokenPriceInUSD
 
 		console.log(
 			`${subAccount.account.publicKey.toBase58()} before swap `,
 			subAccount.tradingTimes,
 			{
+				balance: formatSol(balance),
+				tokenBalance: formatToken(tokenBalance, this.decimals),
 				balanceInUsd,
 				tokenBalanceInUsd
 			}
@@ -223,7 +226,7 @@ export class Program {
 		const amount = tokenBalanceInUsd - target + percent(tokenBalanceInUsd, 10)
 
 		return {
-			amount: parseToken(amount / tokenPriceInUSD),
+			amount: parseToken(amount / tokenPriceInUSD, this.decimals),
 			inMint: this.config.mint,
 			outMint: spl.NATIVE_MINT
 		}
@@ -266,6 +269,19 @@ export class Program {
 		})
 
 		subAccount.tradingTimes++
+
+		const [inAmountDisplay, outAmountDisplay] =
+			inMint.toBase58() === this.config.mint.toBase58()
+				? [formatToken(amount, this.decimals), formatSol(amount)]
+				: [formatSol(amount), formatToken(amount, this.decimals)]
+
+		console.log(
+			`${subAccount.account.publicKey.toBase58()} swapped `,
+			inAmountDisplay,
+			` ${inMint.toBase58()} to `,
+			outAmountDisplay,
+			` ${outMint.toBase58()}`
+		)
 
 		return this.trade(subAccount)
 	}

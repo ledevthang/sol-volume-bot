@@ -10,16 +10,16 @@ export function parseSol(amount: number) {
 	return BigInt(Math.floor(amount * web3.LAMPORTS_PER_SOL))
 }
 
-export function parseToken(amount: number) {
-	return BigInt(Math.floor(amount * 1_000_000))
+export function parseToken(amount: number, decimals: number) {
+	return BigInt(Math.floor(amount * 10 ** decimals))
 }
 
 export function formatSol(lamports: bigint) {
 	return Number(lamports) / web3.LAMPORTS_PER_SOL
 }
 
-export function formatToken(amount: bigint) {
-	return Number(amount) / 1_000_000
+export function formatToken(amount: bigint, decimals: number) {
+	return Number(amount) / 10 ** decimals
 }
 
 export function percent(value: number, percent: number) {
@@ -51,6 +51,7 @@ export async function tryToInsufficient<T>(
 					)}`
 				)
 			} else {
+				console.error(error)
 				console.error(
 					`RPC request error: ${JSON.stringify(
 						{
@@ -68,6 +69,10 @@ export async function tryToInsufficient<T>(
 	})
 }
 
-export function isInsufficientError(_error: any) {
+export function isInsufficientError(error: any) {
+	if (error?.message?.includes("insufficient lamports")) return true
+
+	if (error?.message?.includes("insufficient tokens")) return true
+
 	return false
 }

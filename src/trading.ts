@@ -61,8 +61,7 @@ export const apiSwap = async (
 	)?.publicKey
 
 	if (!inputTokenAcc && !isInputSol) {
-		console.error("do not have input token account")
-		return
+		throw new Error("insufficient tokens")
 	}
 
 	// get statistical transaction fee from api
@@ -150,4 +149,6 @@ export const apiSwap = async (
 			console.log(`${idx} transaction confirmed`)
 		}
 	}
+
+	return swapResponse.data.outputAmount
 }

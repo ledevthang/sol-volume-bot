@@ -45,11 +45,7 @@ const connection = new Connection(
 	"confirmed"
 )
 const owner = Keypair.fromSecretKey(
-	Uint8Array.from(
-		JSON.parse(
-			fs.readFileSync("/Users/lainhathoang/.config/solana/store.json", "utf-8")
-		)
-	)
+	Uint8Array.from(JSON.parse(fs.readFileSync("id.json", "utf-8")))
 )
 
 export const fetchTokenAccountData = async (
