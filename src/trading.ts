@@ -99,55 +99,25 @@ export const apiSwap = async (
 		inputAccount: isInputSol ? undefined : inputTokenAcc?.toBase58(),
 		outputAccount: isOutputSol ? undefined : outputTokenAcc?.toBase58()
 	})
-
 	const allTxBuf = swapTransactions.data.map(tx =>
 		Buffer.from(tx.transaction, "base64")
 	)
 	const allTransactions = allTxBuf.map(txBuf =>
-		isV0Tx ? VersionedTransaction.deserialize(txBuf) : Transaction.from(txBuf)
+		 Transaction.from(txBuf)
 	)
 
 	let idx = 0
-	if (!isV0Tx) {
-		for (const tx of allTransactions) {
-			console.log(`${++idx} transaction sending...`)
-			const transaction = tx as Transaction
-			transaction.sign(owner)
-			const txId = await sendAndConfirmTransaction(
-				connection,
-				transaction,
-				[owner],
-				{ skipPreflight: true }
-			)
-			console.log(`${++idx} transaction confirmed, txId: ${txId}`)
-		}
-	} else {
-		for (const tx of allTransactions) {
-			idx++
-			const transaction = tx as VersionedTransaction
-
-			transaction.sign([owner])
-
-			const txId = await connection.sendTransaction(
-				tx as VersionedTransaction,
-				{ skipPreflight: true, maxRetries: 5 }
-			)
-			const { lastValidBlockHeight, blockhash } =
-				await connection.getLatestBlockhash({
-					commitment: "finalized"
-				})
-			console.log(`${idx} transaction sending..., txId: ${txId}`)
-
-			await connection.confirmTransaction(
-				{
-					blockhash,
-					lastValidBlockHeight,
-					signature: txId
-				},
-				"confirmed"
-			)
-			console.log(`${idx} transaction confirmed`)
-		}
+	for (const tx of allTransactions) {
+		console.log(`${++idx} transaction sending...`)
+		const transaction = tx as Transaction
+		transaction.sign(owner)
+		const txId = await sendAndConfirmTransaction(
+			connection,
+			transaction,
+			[owner],
+			{ skipPreflight: true }
+		)
+		console.log(`${++idx} transaction confirmed, tx: https://solscan.io/tx/${txId}`)
 	}
 
 	return swapResponse.data.outputAmount

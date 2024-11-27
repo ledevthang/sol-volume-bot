@@ -45,7 +45,7 @@ const connection = new Connection(
 	"confirmed"
 )
 const owner = Keypair.fromSecretKey(
-	Uint8Array.from(JSON.parse(fs.readFileSync("id.json", "utf-8")))
+	Uint8Array.from(JSON.parse(fs.readFileSync("/Users/lainhathoang/.config/solana/store.json", "utf-8")))
 )
 
 export const fetchTokenAccountData = async (
@@ -73,12 +73,11 @@ export const fetchTokenAccountData = async (
 }
 
 export const apiSwap = async () => {
-	const inputMint = NATIVE_MINT.toBase58()
-	const outputMint = "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R" // RAY
+	const inputMint = "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R";
+	const outputMint = NATIVE_MINT.toBase58();
 	const amount = 100
 	const slippage = 0.5 // in percent, for this example, 0.5 means 0.5%
 	const txVersion: string = "LEGACY" // or LEGACY
-	const isV0Tx = txVersion === "V0"
 
 	const [isInputSol, isOutputSol] = [
 		inputMint === NATIVE_MINT.toBase58(),
@@ -138,49 +137,21 @@ export const apiSwap = async () => {
 		Buffer.from(tx.transaction, "base64")
 	)
 	const allTransactions = allTxBuf.map(txBuf =>
-		isV0Tx ? VersionedTransaction.deserialize(txBuf) : Transaction.from(txBuf)
+		 Transaction.from(txBuf)
 	)
 
-	console.log(`total ${allTransactions.length} transactions`, swapTransactions)
-
 	let idx = 0
-	if (!isV0Tx) {
-		for (const tx of allTransactions) {
-			console.log(`${++idx} transaction sending...`)
-			const transaction = tx as Transaction
-			transaction.sign(owner)
-			const txId = await sendAndConfirmTransaction(
-				connection,
-				transaction,
-				[owner],
-				{ skipPreflight: true }
-			)
-			console.log(`${++idx} transaction confirmed, txId: ${txId}`)
-		}
-	} else {
-		for (const tx of allTransactions) {
-			idx++
-			const transaction = tx as VersionedTransaction
-			transaction.sign([owner])
-			const txId = await connection.sendTransaction(
-				tx as VersionedTransaction,
-				{ skipPreflight: true }
-			)
-			const { lastValidBlockHeight, blockhash } =
-				await connection.getLatestBlockhash({
-					commitment: "finalized"
-				})
-			console.log(`${idx} transaction sending..., txId: ${txId}`)
-			await connection.confirmTransaction(
-				{
-					blockhash,
-					lastValidBlockHeight,
-					signature: txId
-				},
-				"confirmed"
-			)
-			console.log(`${idx} transaction confirmed`)
-		}
+	for (const tx of allTransactions) {
+		console.log(`${++idx} transaction sending...`)
+		const transaction = tx as Transaction
+		transaction.sign(owner)
+		const txId = await sendAndConfirmTransaction(
+			connection,
+			transaction,
+			[owner],
+			{ skipPreflight: true }
+		)
+		console.log(`${++idx} transaction confirmed, tx: https://solscan.io/tx/${txId}`)
 	}
 }
 apiSwap()
