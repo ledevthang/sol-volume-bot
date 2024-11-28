@@ -2,7 +2,6 @@ import {
 	Connection,
 	Keypair,
 	Transaction,
-	VersionedTransaction,
 	sendAndConfirmTransaction
 } from "@solana/web3.js"
 import {
@@ -45,7 +44,7 @@ const connection = new Connection(
 	"confirmed"
 )
 const owner = Keypair.fromSecretKey(
-	Uint8Array.from(JSON.parse(fs.readFileSync("/Users/lainhathoang/.config/solana/store.json", "utf-8")))
+	Uint8Array.from(JSON.parse(fs.readFileSync("id.json", "utf-8")))
 )
 
 export const fetchTokenAccountData = async (
@@ -73,10 +72,10 @@ export const fetchTokenAccountData = async (
 }
 
 export const apiSwap = async () => {
-	const inputMint = "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R";
-	const outputMint = NATIVE_MINT.toBase58();
+	const inputMint = NATIVE_MINT.toBase58()
+	const outputMint = "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"
 	const amount = 100
-	const slippage = 0.5 // in percent, for this example, 0.5 means 0.5%
+	const slippage = 5 // in percent, for this example, 0.5 means 0.5%
 	const txVersion: string = "LEGACY" // or LEGACY
 
 	const [isInputSol, isOutputSol] = [
@@ -117,6 +116,12 @@ export const apiSwap = async () => {
 		}&txVersion=${txVersion}`
 	)
 
+	console.log("swapResponse: ", swapResponse)
+
+	if (!swapResponse.success) {
+		throw new Error("INSUFFICIENT_LIQUIDITY")
+	}
+
 	const { data: swapTransactions } = await axios.post<{
 		id: string
 		version: string
@@ -133,12 +138,16 @@ export const apiSwap = async () => {
 		outputAccount: isOutputSol ? undefined : outputTokenAcc?.toBase58()
 	})
 
+	console.log("swapTransactions: ", swapTransactions)
+
+	if (!swapTransactions.success) {
+		throw new Error("INSUFFICIENT_LIQUIDITY")
+	}
+
 	const allTxBuf = swapTransactions.data.map(tx =>
 		Buffer.from(tx.transaction, "base64")
 	)
-	const allTransactions = allTxBuf.map(txBuf =>
-		 Transaction.from(txBuf)
-	)
+	const allTransactions = allTxBuf.map(txBuf => Transaction.from(txBuf))
 
 	let idx = 0
 	for (const tx of allTransactions) {
@@ -151,7 +160,9 @@ export const apiSwap = async () => {
 			[owner],
 			{ skipPreflight: true }
 		)
-		console.log(`${++idx} transaction confirmed, tx: https://solscan.io/tx/${txId}`)
+		console.log(
+			`${++idx} transaction confirmed, tx: https://solscan.io/tx/${txId}`
+		)
 	}
 }
 apiSwap()

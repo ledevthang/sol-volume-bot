@@ -24,7 +24,7 @@ export interface SwapCompute {
 	success: true
 	version: "V0" | "V1"
 	openTime?: undefined
-	msg: undefined
+	msg?: string
 	data: {
 		swapType: "BaseIn" | "BaseOut"
 		inputMint: string

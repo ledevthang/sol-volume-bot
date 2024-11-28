@@ -111,14 +111,6 @@ export class Program {
 	) {
 		const transaction = new web3.Transaction()
 
-		transaction.add(
-			web3.SystemProgram.transfer({
-				fromPubkey: sender.publicKey,
-				toPubkey: receiver.publicKey,
-				lamports
-			})
-		)
-
 		const senderAtaAddress = await spl.getAssociatedTokenAddress(
 			this.config.mint,
 			sender.publicKey
@@ -156,6 +148,14 @@ export class Program {
 				sender.publicKey,
 				tokenAmount
 			)
+		)
+
+		transaction.add(
+			web3.SystemProgram.transfer({
+				fromPubkey: sender.publicKey,
+				toPubkey: receiver.publicKey,
+				lamports
+			})
 		)
 
 		await web3.sendAndConfirmTransaction(this.connection, transaction, [sender])

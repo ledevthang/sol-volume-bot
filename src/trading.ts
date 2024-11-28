@@ -8,11 +8,11 @@ import {
 	type Connection,
 	type Keypair,
 	Transaction,
-	VersionedTransaction,
 	sendAndConfirmTransaction
 } from "@solana/web3.js"
 import axios from "axios"
 import type { SwapCompute, SwapParams } from "./types.js"
+import { sleep } from "./utils.js"
 
 const fetchTokenAccountData = async (
 	connection: Connection,
@@ -45,7 +45,6 @@ export const apiSwap = async (
 	const { owner, inputMint, outputMint, amountIn, slippage } = swapParams
 
 	const txVersion: string = "LEGACY" // or LEGACY
-	const isV0Tx = txVersion === "V0"
 
 	const [isInputSol, isOutputSol] = [
 		inputMint === NATIVE_MINT.toBase58(),
@@ -84,10 +83,15 @@ export const apiSwap = async (
 		}&txVersion=${txVersion}`
 	)
 
+	if (data.success === false) {
+		throw new Error(`Raydium swap compute response error ${swapResponse.msg}`)
+	}
+
 	const { data: swapTransactions } = await axios.post<{
 		id: string
 		version: string
 		success: boolean
+		msg?: string
 		data: { transaction: string }[]
 	}>(`${API_URLS.SWAP_HOST}/transaction/swap-base-in`, {
 		computeUnitPriceMicroLamports: String(data.data.default.h),
@@ -99,12 +103,17 @@ export const apiSwap = async (
 		inputAccount: isInputSol ? undefined : inputTokenAcc?.toBase58(),
 		outputAccount: isOutputSol ? undefined : outputTokenAcc?.toBase58()
 	})
+
+	if (!data.success) {
+		throw new Error(
+			`Raydium swap transaction response error ${swapTransactions.msg}`
+		)
+	}
+
 	const allTxBuf = swapTransactions.data.map(tx =>
 		Buffer.from(tx.transaction, "base64")
 	)
-	const allTransactions = allTxBuf.map(txBuf =>
-		 Transaction.from(txBuf)
-	)
+	const allTransactions = allTxBuf.map(txBuf => Transaction.from(txBuf))
 
 	let idx = 0
 	for (const tx of allTransactions) {
@@ -117,8 +126,12 @@ export const apiSwap = async (
 			[owner],
 			{ skipPreflight: true }
 		)
-		console.log(`${++idx} transaction confirmed, tx: https://solscan.io/tx/${txId}`)
+		console.log(
+			`${++idx} transaction confirmed, tx: https://solscan.io/tx/${txId}`
+		)
 	}
+
+	await sleep(5000)
 
 	return swapResponse.data.outputAmount
 }

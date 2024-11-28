@@ -36,7 +36,7 @@ export async function tryToInsufficient<T>(
 	return retry(thunk, {
 		timeout: "INFINITELY",
 		retries: "INFINITELY",
-		delay: 3_000,
+		delay: 5_000,
 		retryIf: error => {
 			if (isAxiosError(error)) {
 				console.error(
@@ -51,7 +51,6 @@ export async function tryToInsufficient<T>(
 					)}`
 				)
 			} else {
-				console.error(error)
 				console.error(
 					`RPC request error: ${JSON.stringify(
 						{
@@ -73,6 +72,10 @@ export function isInsufficientError(error: any) {
 	if (error?.message?.includes("insufficient lamports")) return true
 
 	if (error?.message?.includes("insufficient tokens")) return true
+
+	if (error?.message?.includes("insufficient funds")) return true
+
+	if (error?.message?.includes("Raydium swap")) return true
 
 	return false
 }
