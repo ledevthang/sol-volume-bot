@@ -7,8 +7,6 @@ async function main() {
 
 	const mintAccount = await getMint(connection, config.mint)
 
-	console.log(mintAccount.decimals)
-
 	const program = new Program(connection, owner, config, mintAccount.decimals)
 
 	await program.run()

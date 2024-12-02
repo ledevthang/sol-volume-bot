@@ -2,6 +2,7 @@ import fs from "node:fs/promises"
 import * as spl from "@solana/spl-token"
 import * as web3 from "@solana/web3.js"
 import { DateTime } from "luxon"
+// import { retry } from "ts-retry-promise"
 import type { Config } from "./config.js"
 import { getPrice } from "./services.js"
 import { apiSwap } from "./trading.js"
@@ -12,6 +13,7 @@ import {
 	parseSol,
 	parseToken,
 	percent,
+	sleep,
 	tryToInsufficient
 } from "./utils.js"
 
@@ -32,6 +34,12 @@ export class Program {
 		let subAccounts = await this.generateAccounts(
 			this.config.walletsConcurrency
 		)
+
+		// await retry(() => this.initTokensAndNative(subAccounts), {
+		// 	retries: "INFINITELY",
+		// 	delay: 6000,
+		// 	timeout: "INFINITELY"
+		// })
 
 		await this.initTokensAndNative(subAccounts)
 
@@ -109,7 +117,7 @@ export class Program {
 		lamports: bigint,
 		tokenAmount: bigint
 	) {
-		const transaction = new web3.Transaction()
+		const instructions = []
 
 		const senderAtaAddress = await spl.getAssociatedTokenAddress(
 			this.config.mint,
@@ -128,7 +136,7 @@ export class Program {
 				error instanceof spl.TokenAccountNotFoundError ||
 				error instanceof spl.TokenInvalidAccountOwnerError
 			) {
-				transaction.add(
+				instructions.push(
 					spl.createAssociatedTokenAccountInstruction(
 						sender.publicKey,
 						receiverAtaAddress,
@@ -141,7 +149,7 @@ export class Program {
 			}
 		}
 
-		transaction.add(
+		instructions.push(
 			spl.createTransferInstruction(
 				senderAtaAddress,
 				receiverAtaAddress,
@@ -150,7 +158,7 @@ export class Program {
 			)
 		)
 
-		transaction.add(
+		instructions.push(
 			web3.SystemProgram.transfer({
 				fromPubkey: sender.publicKey,
 				toPubkey: receiver.publicKey,
@@ -158,7 +166,29 @@ export class Program {
 			})
 		)
 
-		await web3.sendAndConfirmTransaction(this.connection, transaction, [sender])
+		const { blockhash, lastValidBlockHeight } =
+			await this.connection.getLatestBlockhash()
+
+		const message = new web3.TransactionMessage({
+			payerKey: sender.publicKey,
+			recentBlockhash: blockhash,
+			instructions
+		}).compileToV0Message()
+
+		const transaction = new web3.VersionedTransaction(message)
+
+		transaction.sign([sender])
+
+		const signature = await this.connection.sendTransaction(transaction)
+
+		await this.connection.confirmTransaction(
+			{
+				blockhash,
+				lastValidBlockHeight,
+				signature
+			},
+			"confirmed"
+		)
 
 		console.log(
 			`${sender.publicKey} transfered `,
@@ -282,6 +312,8 @@ export class Program {
 			outAmountDisplay,
 			` ${outMint.toBase58()}`
 		)
+
+		await sleep(5000)
 
 		return this.trade(subAccount)
 	}

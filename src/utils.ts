@@ -1,5 +1,6 @@
 import * as web3 from "@solana/web3.js"
 import { isAxiosError } from "axios"
+import { Decimal } from "decimal.js"
 import { retry } from "ts-retry-promise"
 
 export function sleep(duration: number) {
@@ -15,11 +16,11 @@ export function parseToken(amount: number, decimals: number) {
 }
 
 export function formatSol(lamports: bigint) {
-	return Number(lamports) / web3.LAMPORTS_PER_SOL
+	return new Decimal(lamports.toString()).div(web3.LAMPORTS_PER_SOL).toNumber()
 }
 
 export function formatToken(amount: bigint, decimals: number) {
-	return Number(amount) / 10 ** decimals
+	return new Decimal(amount.toString()).div(10 ** decimals).toNumber()
 }
 
 export function percent(value: number, percent: number) {
@@ -50,7 +51,7 @@ export async function tryToInsufficient<T>(
 						1
 					)}`
 				)
-			} else {
+			} else if (error?.message) {
 				console.error(
 					`RPC request error: ${JSON.stringify(
 						{
@@ -61,6 +62,8 @@ export async function tryToInsufficient<T>(
 						1
 					)}`
 				)
+			} else {
+				console.error(error)
 			}
 
 			return !isInsufficientError(error)
