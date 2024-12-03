@@ -2,7 +2,6 @@ import fs from "node:fs/promises"
 import * as spl from "@solana/spl-token"
 import * as web3 from "@solana/web3.js"
 import { DateTime } from "luxon"
-// import { retry } from "ts-retry-promise"
 import type { Config } from "./config.js"
 import { getPrice } from "./services.js"
 import { apiSwap } from "./trading.js"
@@ -16,6 +15,7 @@ import {
 	sleep,
 	tryToInsufficient
 } from "./utils.js"
+import { retry } from "ts-retry-promise"
 
 type SubAccount = {
 	account: web3.Keypair
@@ -35,13 +35,15 @@ export class Program {
 			this.config.walletsConcurrency
 		)
 
-		// await retry(() => this.initTokensAndNative(subAccounts), {
-		// 	retries: "INFINITELY",
-		// 	delay: 6000,
-		// 	timeout: "INFINITELY"
-		// })
-
-		await this.initTokensAndNative(subAccounts)
+		await retry(() => this.initTokensAndNative(subAccounts), {
+			retries: "INFINITELY",
+			delay: 6000,
+			timeout: "INFINITELY",
+			retryIf: _ => {
+				console.error("can not transfer sol and token to sub account")
+				return true
+			}
+		})
 
 		for (;;) {
 			if (subAccounts.length === 0) {
