@@ -30,6 +30,7 @@
 		"@solana/spl-token": "^0.4.9",
 		"@solana/web3.js": "^1.95.5",
 		"axios": "^1.7.8",
+		"bs58": "^6.0.0",
 		"decimal.js": "^10.4.3",
 		"dotenv": "^16.4.5",
 		"luxon": "^3.5.0",

@@ -5,6 +5,7 @@ import {
 	LAMPORTS_PER_SOL,
 	PublicKey
 } from "@solana/web3.js"
+import bs58 from "bs58"
 import { z } from "zod"
 
 export type Config = {
@@ -46,7 +47,7 @@ export function parseConfig() {
 	)
 
 	const connection = new Connection(RPC_URL, "confirmed")
-	const owner = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(WALLET)))
+	const owner = Keypair.fromSecretKey(bs58.decode(WALLET))
 
 	return { connection, owner, config }
 }
