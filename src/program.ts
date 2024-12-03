@@ -319,4 +319,84 @@ export class Program {
 
 		return this.trade(subAccount)
 	}
+
+	public async withdraw() {
+		const data = await fs.readFile("wallets.txt", "utf-8")
+
+		const wallets: {
+			pubkey: string
+			secret: number[]
+		}[] = data
+			.split("\n")
+			.filter(s => !!s)
+			.map(s => JSON.parse(s))
+
+		for (const wallet of wallets) {
+			const sender = web3.Keypair.fromSecretKey(Uint8Array.from(wallet.secret))
+			try {
+				const [lamports, tokenBalance] = await this.getBalanceAndTokenBalance(
+					sender.publicKey
+				)
+
+				const instructions = []
+
+				const senderAtaAddress = await spl.getAssociatedTokenAddress(
+					this.config.mint,
+					sender.publicKey
+				)
+
+				const receiverAtaAddress = await spl.getAssociatedTokenAddress(
+					this.config.mint,
+					this.owner.publicKey
+				)
+
+				if (tokenBalance > 0n)
+					instructions.push(
+						spl.createTransferInstruction(
+							senderAtaAddress,
+							receiverAtaAddress,
+							sender.publicKey,
+							tokenBalance
+						)
+					)
+
+				if (lamports > 0)
+					instructions.push(
+						web3.SystemProgram.transfer({
+							fromPubkey: sender.publicKey,
+							toPubkey: this.owner.publicKey,
+							lamports
+						})
+					)
+
+				if (instructions.length === 0) continue
+
+				const { blockhash, lastValidBlockHeight } =
+					await this.connection.getLatestBlockhash()
+
+				const message = new web3.TransactionMessage({
+					payerKey: this.owner.publicKey,
+					recentBlockhash: blockhash,
+					instructions
+				}).compileToV0Message()
+
+				const transaction = new web3.VersionedTransaction(message)
+
+				transaction.sign([sender, this.owner])
+
+				const signature = await this.connection.sendTransaction(transaction)
+
+				await this.connection.confirmTransaction(
+					{
+						blockhash,
+						lastValidBlockHeight,
+						signature
+					},
+					"confirmed"
+				)
+
+				console.log(`withdrawed from ${sender.publicKey.toBase58()}`)
+			} catch {}
+		}
+	}
 }
