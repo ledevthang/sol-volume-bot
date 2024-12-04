@@ -1,7 +1,9 @@
 import fs from "node:fs/promises"
 import * as spl from "@solana/spl-token"
 import * as web3 from "@solana/web3.js"
+import bs58 from "bs58"
 import { DateTime } from "luxon"
+import { retry } from "ts-retry-promise"
 import type { Config } from "./config.js"
 import { getPrice } from "./services.js"
 import { apiSwap } from "./trading.js"
@@ -15,7 +17,6 @@ import {
 	sleep,
 	tryToInsufficient
 } from "./utils.js"
-import { retry } from "ts-retry-promise"
 
 type SubAccount = {
 	account: web3.Keypair
@@ -53,7 +54,7 @@ export class Program {
 
 			const executingAccounts = subAccounts.map(({ account }) => ({
 				address: account.publicKey,
-				privateKey: account.secretKey
+				privateKey: bs58.encode(account.secretKey)
 			}))
 
 			await fs.writeFile(
