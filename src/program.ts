@@ -57,7 +57,7 @@ export class Program {
 			}))
 
 			await fs.writeFile(
-				"executing-wallets.txt",
+				"executing-solana-wallets.txt",
 				`${JSON.stringify(executingAccounts, null, 1)}`
 			)
 
@@ -92,7 +92,10 @@ export class Program {
 					date: DateTime.now().toISO()
 				}
 
-				await fs.appendFile("wallets.txt", `${JSON.stringify(walletData)}\n`)
+				await fs.appendFile(
+					"solana-wallets.txt",
+					`${JSON.stringify(walletData)}\n`
+				)
 
 				return {
 					account,
@@ -321,7 +324,7 @@ export class Program {
 	}
 
 	public async withdraw() {
-		const data = await fs.readFile("wallets.txt", "utf-8")
+		const data = await fs.readFile("solana-wallets.txt", "utf-8")
 
 		const wallets: {
 			pubkey: string
