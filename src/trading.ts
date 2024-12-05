@@ -52,9 +52,11 @@ export const apiSwap = async (
 	]
 
 	const { tokenAccounts } = await fetchTokenAccountData(connection, owner)
+
 	const inputTokenAcc = tokenAccounts.find(
 		a => a.mint.toBase58() === inputMint
 	)?.publicKey
+
 	const outputTokenAcc = tokenAccounts.find(
 		a => a.mint.toBase58() === outputMint
 	)?.publicKey
@@ -75,6 +77,10 @@ export const apiSwap = async (
 		data: { default: { vh: number; h: number; m: number } }
 	}>(`${API_URLS.BASE_HOST}${API_URLS.PRIORITY_FEE}`)
 
+	if (!data.success) {
+		throw new Error("Raydium reject: can not get PRIORITY_FEE")
+	}
+
 	const { data: swapResponse } = await axios.get<SwapCompute>(
 		`${
 			API_URLS.SWAP_HOST
@@ -83,8 +89,8 @@ export const apiSwap = async (
 		}&txVersion=${txVersion}`
 	)
 
-	if (data.success === false) {
-		throw new Error(`Raydium swap compute response error ${swapResponse.msg}`)
+	if (!swapResponse.success) {
+		throw new Error(`Raydium reject: compute swap error ${swapResponse.msg}`)
 	}
 
 	const { data: swapTransactions } = await axios.post<{
@@ -104,9 +110,9 @@ export const apiSwap = async (
 		outputAccount: isOutputSol ? undefined : outputTokenAcc?.toBase58()
 	})
 
-	if (!data.success) {
+	if (!swapTransactions.success) {
 		throw new Error(
-			`Raydium swap transaction response error ${swapTransactions.msg}`
+			`Raydium reject: get swap transaction error ${swapTransactions.msg}`
 		)
 	}
 

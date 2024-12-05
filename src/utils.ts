@@ -78,7 +78,7 @@ export function isInsufficientError(error: any) {
 
 	if (error?.message?.includes("insufficient funds")) return true
 
-	if (error?.message?.includes("Raydium swap")) return true
+	if (error?.message?.includes("Raydium reject")) return true
 
 	return false
 }
