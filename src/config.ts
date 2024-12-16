@@ -7,7 +7,6 @@ export type Config = z.infer<typeof schema>
 const schema = z.object({
 	private_key: notEmptyStr(),
 	rpc_url: z.string().url(),
-	one_inch_api_key: notEmptyStr(),
 
 	token_address: pubkey(),
 
