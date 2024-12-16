@@ -1,0 +1,12 @@
+{
+	"private_key": "",
+	"rpc_url": "",
+	"token_address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+	"slippage": 1,
+	"consecutive_buys": 3,
+	"consecutive_sells": 2,
+	"wait_time_min": 2,
+	"wait_time_max": 4,
+	"min_sol": 0.01,
+	"max_sol": 0.04
+}

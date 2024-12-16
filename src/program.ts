@@ -3,9 +3,9 @@ import * as spl from "@solana/spl-token"
 import * as web3 from "@solana/web3.js"
 import bs58 from "bs58"
 import { DateTime } from "luxon"
-import { retry } from "ts-retry-promise"
 import type { Config } from "./config.js"
-import { getPrice } from "./services.js"
+import { decryptWallet, encryptWallet } from "./hashing.js"
+import { Logger } from "./logger.js"
 import { apiSwap } from "./trading.js"
 import {
 	bigintPercent,
@@ -13,111 +13,100 @@ import {
 	formatToken,
 	parseSol,
 	parseToken,
-	percent,
+	random,
 	sleep,
 	tryToInsufficient
 } from "./utils.js"
 
-type SubAccount = {
-	account: web3.Keypair
-	tradingTimes: number
-}
-
 export class Program {
 	constructor(
 		private connection: web3.Connection,
-		private owner: web3.Keypair,
-		private config: Config,
-		private decimals: number
+		private root: web3.Keypair,
+		private mint: spl.Mint,
+		private config: Config
 	) {}
 
-	async run() {
-		let subAccounts = await this.generateAccounts(
-			this.config.walletsConcurrency
-		)
-
-		await retry(() => this.initTokensAndNative(subAccounts), {
-			retries: "INFINITELY",
-			delay: 6000,
-			timeout: "INFINITELY",
-			retryIf: _ => {
-				console.error("can not transfer sol and token to sub account")
-				return true
-			}
-		})
+	public async run() {
+		let account = this.root
 
 		for (;;) {
-			if (subAccounts.length === 0) {
-				console.log("🦀 🦀 🦀 All sub_accounts are insufficient >> finished")
-				return
-			}
-
-			const executingAccounts = subAccounts.map(({ account }) => ({
-				address: account.publicKey,
-				privateKey: bs58.encode(account.secretKey)
-			}))
-
-			await fs.writeFile(
-				"executing-solana-wallets.txt",
-				`${JSON.stringify(executingAccounts, null, 1)}`
-			)
-
-			const rs = await Promise.allSettled(
-				subAccounts.map(async subAccount =>
-					tryToInsufficient(() => this.trade(subAccount))
-				)
-			)
-
-			subAccounts = []
-
-			for (const result of rs) {
-				if (result.status === "fulfilled") subAccounts.push(result.value)
-			}
-
-			if (subAccounts.length > 0) {
-				console.log(
-					`switch to new accounts ${subAccounts.map(account => account.account.publicKey.toBase58())}`
-				)
-			}
+			account = await tryToInsufficient(() => this.executeTrades(account))
 		}
 	}
 
-	private generateAccounts(quantity: number): Promise<SubAccount[]> {
-		return Promise.all(
-			new Array(quantity).fill(1).map(async () => {
-				const account = web3.Keypair.generate()
+	private async executeTrades(account: web3.Keypair): Promise<web3.Keypair> {
+		let buyCount = 0
+		let sellCount = 0
 
-				const walletData = {
-					pubkey: account.publicKey.toBase58(),
-					secret: Array.from(account.secretKey),
-					date: DateTime.now().toISO()
-				}
+		for (;;) {
+			let isBuy = true
 
-				await fs.appendFile(
-					"solana-wallets.txt",
-					`${JSON.stringify(walletData)}\n`
-				)
+			if (buyCount === this.config.consecutive_buys) isBuy = false
 
-				return {
-					account,
-					tradingTimes: 0
-				}
+			if (
+				buyCount >= this.config.consecutive_buys &&
+				sellCount >= this.config.consecutive_sells
+			)
+				return this.createNewAccountAndTransfer(account)
+
+			const [solBalance, tokenBalance] = await this.balance(account.publicKey)
+
+			Logger.info("balance::", {
+				solBalance: formatSol(solBalance),
+				tokenBalance: formatToken(tokenBalance, this.mint.decimals)
 			})
-		)
-	}
 
-	private async initTokensAndNative(subAccounts: SubAccount[]) {
-		for (const subAccount of subAccounts) {
-			await this.transferAssets(
-				this.owner,
-				subAccount.account,
-				this.config.initSolPerWallet,
-				this.config.initTokensPerWallet
-			)
+			const randUiAmount = random(this.config.min_sol, this.config.max_sol)
+
+			const amount = isBuy
+				? parseSol(randUiAmount)
+				: parseToken(randUiAmount, this.mint.decimals)
+
+			if (isBuy && solBalance < amount) {
+				Logger.error(
+					`Insufficient SOL for buy. Required: ${formatSol(amount)}, Available: ${formatSol(solBalance)}`
+				)
+				await sleep(2_000)
+				continue
+			}
+
+			if (!isBuy && tokenBalance < amount) {
+				Logger.error(
+					`Insufficient tokens for sell. Required: ${formatToken(amount, this.mint.decimals)}, Available: ${formatToken(tokenBalance, this.mint.decimals)}`
+				)
+				await sleep(2_000)
+				continue
+			}
+
+			const outputAmount = await apiSwap(this.connection, {
+				owner: this.root,
+				inputMint: isBuy
+					? spl.NATIVE_MINT.toBase58()
+					: this.mint.address.toBase58(),
+				outputMint: isBuy
+					? this.mint.address.toBase58()
+					: spl.NATIVE_MINT.toBase58(),
+				amountIn: amount,
+				slippage: this.config.slippage
+			})
+
+			const message = isBuy
+				? `Buy ${formatToken(BigInt(outputAmount), this.mint.decimals)} tokens @ ${formatSol(BigInt(amount))} SOL`
+				: `Sell ${formatToken(amount, this.mint.decimals)} tokens @ ${formatSol(BigInt(outputAmount))} SOL`
+
+			Logger.info(message)
+
+			if (isBuy) buyCount++
+			else sellCount++
+
+			const restTime =
+				random(this.config.wait_time_min, this.config.wait_time_max) * 1000
+
+			await sleep(restTime)
 		}
 	}
 
-	private async transferAssets(
+	private async transferSolAndToken(
 		sender: web3.Keypair,
 		receiver: web3.Keypair,
 		lamports: bigint,
@@ -126,12 +115,12 @@ export class Program {
 		const instructions = []
 
 		const senderAtaAddress = await spl.getAssociatedTokenAddress(
-			this.config.mint,
+			this.mint.address,
 			sender.publicKey
 		)
 
 		const receiverAtaAddress = await spl.getAssociatedTokenAddress(
-			this.config.mint,
+			this.mint.address,
 			receiver.publicKey
 		)
 
@@ -147,7 +136,7 @@ export class Program {
 						sender.publicKey,
 						receiverAtaAddress,
 						receiver.publicKey,
-						this.config.mint
+						this.mint.address
 					)
 				)
 			} else {
@@ -181,6 +170,22 @@ export class Program {
 			instructions
 		}).compileToV0Message()
 
+		const fee = await this.connection.getFeeForMessage(message)
+
+		if (fee.value) {
+			const lamportsNeedToTransfer = lamports - BigInt(fee.value)
+
+			instructions.pop()
+
+			instructions.push(
+				web3.SystemProgram.transfer({
+					fromPubkey: sender.publicKey,
+					toPubkey: receiver.publicKey,
+					lamports: lamportsNeedToTransfer
+				})
+			)
+		}
+
 		const transaction = new web3.VersionedTransaction(message)
 
 		transaction.sign([sender])
@@ -195,163 +200,68 @@ export class Program {
 			},
 			"confirmed"
 		)
-
-		console.log(
-			`${sender.publicKey} transfered `,
-			formatSol(lamports),
-			` sols to ${receiver.publicKey}`
-		)
-
-		console.log(
-			`${sender.publicKey} transfered `,
-			formatToken(tokenAmount, this.decimals),
-			` tokens to ${receiver.publicKey}`
-		)
 	}
 
-	private async getBalanceAndTokenBalance(pubkey: web3.PublicKey) {
+	private async balance(pubkey: web3.PublicKey) {
 		const balance = await this.connection.getBalance(pubkey)
 
 		const ataAddress = await spl.getAssociatedTokenAddress(
-			this.config.mint,
+			this.mint.address,
 			pubkey
 		)
+
 		const ataAccount = await spl.getAccount(this.connection, ataAddress)
 
 		return [BigInt(balance), ataAccount.amount]
 	}
 
-	private async calculateBeforeSwap(subAccount: SubAccount) {
-		const [balance, tokenBalance] = await this.getBalanceAndTokenBalance(
-			subAccount.account.publicKey
-		)
+	private async createNewAccountAndTransfer(previousAccount: web3.Keypair) {
+		const account = web3.Keypair.generate()
 
-		const price = await getPrice([spl.NATIVE_MINT, this.config.mint])
-
-		const nativePriceInUSD = Number(price[spl.NATIVE_MINT.toBase58()])
-		const tokenPriceInUSD = Number(price[this.config.mint.toBase58()])
-
-		const balanceInUsd = Number(formatSol(balance)) * nativePriceInUSD
-
-		const tokenBalanceInUsd =
-			Number(formatToken(tokenBalance, this.decimals)) * tokenPriceInUSD
-
-		console.log(
-			`${subAccount.account.publicKey.toBase58()} before swap `,
-			subAccount.tradingTimes,
-			{
-				balance: formatSol(balance),
-				tokenBalance: formatToken(tokenBalance, this.decimals),
-				balanceInUsd,
-				tokenBalanceInUsd
-			}
-		)
-
-		const target = (balanceInUsd + tokenBalanceInUsd) / 2
-
-		if (balanceInUsd > tokenBalanceInUsd) {
-			const amount = balanceInUsd - target + percent(balanceInUsd, 10)
-
-			return {
-				amount: parseSol(amount / nativePriceInUSD),
-				inMint: spl.NATIVE_MINT,
-				outMint: this.config.mint
-			}
-		}
-
-		const amount = tokenBalanceInUsd - target + percent(tokenBalanceInUsd, 10)
-
-		return {
-			amount: parseToken(amount / tokenPriceInUSD, this.decimals),
-			inMint: this.config.mint,
-			outMint: spl.NATIVE_MINT
-		}
-	}
-
-	private async createNewSubAccountAndTransferAssets(subAccount: SubAccount) {
-		const [newSubAccount] = await this.generateAccounts(1)
-
-		const [balance, tokenBalance] = await this.getBalanceAndTokenBalance(
-			subAccount.account.publicKey
-		)
-
-		await this.transferAssets(
-			subAccount.account,
-			newSubAccount.account,
-			bigintPercent(balance, this.config.amountTransferPercent),
-			bigintPercent(tokenBalance, this.config.amountTransferPercent)
-		)
-
-		return newSubAccount
-	}
-
-	private async trade(subAccount: SubAccount): Promise<SubAccount> {
-		if (subAccount.tradingTimes === this.config.numberOfTradesPerWallet) {
-			const newsubAccount =
-				await this.createNewSubAccountAndTransferAssets(subAccount)
-
-			return newsubAccount
-		}
-
-		const { amount, inMint, outMint } =
-			await this.calculateBeforeSwap(subAccount)
-
-		await apiSwap(this.connection, {
-			owner: subAccount.account,
-			inputMint: inMint.toBase58(),
-			outputMint: outMint.toBase58(),
-			amountIn: amount,
-			slippage: this.config.slippage
+		const encrypted = encryptWallet({
+			account,
+			createdAt: DateTime.now()
 		})
 
-		subAccount.tradingTimes++
+		await fs.appendFile("solana-wallets.txt", `\n${encrypted}`)
 
-		const [inAmountDisplay, outAmountDisplay] =
-			inMint.toBase58() === this.config.mint.toBase58()
-				? [formatToken(amount, this.decimals), formatSol(amount)]
-				: [formatSol(amount), formatToken(amount, this.decimals)]
-
-		console.log(
-			`${subAccount.account.publicKey.toBase58()} swapped `,
-			inAmountDisplay,
-			` ${inMint.toBase58()} to `,
-			outAmountDisplay,
-			` ${outMint.toBase58()}`
+		const [balance, tokenBalance] = await this.balance(
+			previousAccount.publicKey
 		)
 
-		await sleep(5000)
+		await this.transferSolAndToken(
+			previousAccount,
+			account,
+			bigintPercent(balance, 99),
+			bigintPercent(tokenBalance, 99)
+		)
 
-		return this.trade(subAccount)
+		return account
 	}
 
 	public async withdraw() {
-		const data = await fs.readFile("solana-wallets.txt", "utf-8")
-
-		const wallets: {
-			pubkey: string
-			secret: number[]
-		}[] = data
-			.split("\n")
-			.filter(s => !!s)
-			.map(s => JSON.parse(s))
+		const wallets = await fs
+			.readFile("evm-wallets.txt", "utf8")
+			.then(rawLines => rawLines.split("\n"))
+			.then(lines => lines.filter(Boolean))
+			.then(rawWallets => rawWallets.map(decryptWallet))
 
 		for (const wallet of wallets) {
-			const sender = web3.Keypair.fromSecretKey(Uint8Array.from(wallet.secret))
+			const sender = web3.Keypair.fromSecretKey(bs58.decode(wallet.privateKey))
+
 			try {
-				const [lamports, tokenBalance] = await this.getBalanceAndTokenBalance(
-					sender.publicKey
-				)
+				const [lamports, tokenBalance] = await this.balance(sender.publicKey)
 
 				const instructions = []
 
 				const senderAtaAddress = await spl.getAssociatedTokenAddress(
-					this.config.mint,
+					this.mint.address,
 					sender.publicKey
 				)
 
 				const receiverAtaAddress = await spl.getAssociatedTokenAddress(
-					this.config.mint,
-					this.owner.publicKey
+					this.mint.address,
+					this.root.publicKey
 				)
 
 				if (tokenBalance > 0n)
@@ -368,7 +278,7 @@ export class Program {
 					instructions.push(
 						web3.SystemProgram.transfer({
 							fromPubkey: sender.publicKey,
-							toPubkey: this.owner.publicKey,
+							toPubkey: this.root.publicKey,
 							lamports
 						})
 					)
@@ -379,14 +289,14 @@ export class Program {
 					await this.connection.getLatestBlockhash()
 
 				const message = new web3.TransactionMessage({
-					payerKey: this.owner.publicKey,
+					payerKey: this.root.publicKey,
 					recentBlockhash: blockhash,
 					instructions
 				}).compileToV0Message()
 
 				const transaction = new web3.VersionedTransaction(message)
 
-				transaction.sign([sender, this.owner])
+				transaction.sign([sender, this.root])
 
 				const signature = await this.connection.sendTransaction(transaction)
 
@@ -399,7 +309,7 @@ export class Program {
 					"confirmed"
 				)
 
-				console.log(`withdrawed from ${sender.publicKey.toBase58()}`)
+				Logger.info(`withdrawed from ${sender.publicKey.toBase58()}`)
 			} catch {}
 		}
 	}

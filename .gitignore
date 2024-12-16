@@ -1,5 +1,6 @@
 dist
 node_modules
-**/*wallets.txt
+**/*wallets.*
 id.json
 .env
+/config.json
