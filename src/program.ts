@@ -233,7 +233,7 @@ export class Program {
 			previousAccount.publicKey
 		)
 
-		let lamportsToSend = bigintPercent(tokenBalance, 99)
+		let lamportsToSend = bigintPercent(balance, 99)
 
 		for (;;) {
 			Logger.info("lamportsToSend: ", lamportsToSend)
@@ -241,8 +241,8 @@ export class Program {
 				await this.transferSolAndToken(
 					previousAccount,
 					account,
-					bigintPercent(balance, 99),
-					lamportsToSend
+					lamportsToSend,
+					bigintPercent(tokenBalance, 99)
 				)
 
 				Logger.info("transfered 99% assets to new account")
