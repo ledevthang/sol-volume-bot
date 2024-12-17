@@ -56,7 +56,10 @@ export class Program {
 				buyCount >= this.config.consecutive_buys &&
 				sellCount >= this.config.consecutive_sells
 			) {
-				const newAccount = await this.createNewAccountAndTransfer(account)
+				const newAccount = await tryToInsufficient(
+					() => this.createNewAccountAndTransfer(account),
+					"transfer assets"
+				)
 				return newAccount
 			}
 
@@ -117,7 +120,7 @@ export class Program {
 				})
 
 				return { amount, outputAmount }
-			})
+			}, "swap")
 
 			if (!out) continue
 
@@ -253,6 +256,7 @@ export class Program {
 
 		for (;;) {
 			Logger.info("lamportsToSend: ", lamportsToSend)
+
 			try {
 				await this.transferSolAndToken(
 					previousAccount,
@@ -272,9 +276,6 @@ export class Program {
 				if (match) {
 					const lamportsAvaiable = BigInt(match[1])
 					const lamportsNeeded = BigInt(match[2])
-
-					Logger.info("lamportsAvaiable: ", lamportsAvaiable)
-					Logger.info("lamportsNeeded: ", lamportsNeeded)
 
 					lamportsToSend -= lamportsNeeded - lamportsAvaiable
 
@@ -358,7 +359,7 @@ export class Program {
 
 				Logger.info(`withdrawed from ${sender.publicKey.toBase58()}`)
 			} catch (error) {
-				Logger.error(error)
+				logError(error)
 			}
 		}
 	}

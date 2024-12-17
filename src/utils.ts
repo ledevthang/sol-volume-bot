@@ -41,7 +41,8 @@ export function random(min: number, max: number) {
 }
 
 export async function tryToInsufficient<T>(
-	thunk: () => Promise<T>
+	thunk: () => Promise<T>,
+	context: string
 ): Promise<T> {
 	return retry(thunk, {
 		timeout: "INFINITELY",
@@ -49,6 +50,7 @@ export async function tryToInsufficient<T>(
 		delay: 5_000,
 		retryIf: error => {
 			logError(error)
+			Logger.info(`retrying ${context}...`)
 			return !isInsufficientError(error)
 		}
 	})
