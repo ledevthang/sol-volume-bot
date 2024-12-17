@@ -2,10 +2,12 @@ import fs from "node:fs/promises"
 import * as spl from "@solana/spl-token"
 import * as web3 from "@solana/web3.js"
 import bs58 from "bs58"
+import { Decimal } from "decimal.js"
 import { DateTime } from "luxon"
 import type { Config } from "./config.js"
 import { decryptWallet, encryptWallet } from "./hashing.js"
 import { Logger } from "./logger.js"
+import { getPrice } from "./services.js"
 import { apiSwap } from "./trading.js"
 import {
 	bigintPercent,
@@ -61,17 +63,29 @@ export class Program {
 			const out = await tryToInsufficient(async () => {
 				const [solBalance, tokenBalance] = await this.balance(account.publicKey)
 
-				const randUiAmount = random(this.config.min_sol, this.config.max_sol)
+				let uiAmount = random(this.config.min_sol, this.config.max_sol)
+
+				if (!isBuy) {
+					const price = await getPrice([spl.NATIVE_MINT, this.mint.address])
+
+					const solPriceInUsd = new Decimal(price[spl.NATIVE_MINT.toBase58()])
+
+					const tokenPriceInUsd = new Decimal(
+						price[this.mint.address.toBase58()]
+					)
+
+					uiAmount = solPriceInUsd.div(tokenPriceInUsd).mul(uiAmount).toNumber()
+				}
 
 				const amount = isBuy
-					? parseSol(randUiAmount)
-					: parseToken(randUiAmount, this.mint.decimals)
+					? parseSol(uiAmount)
+					: parseToken(uiAmount, this.mint.decimals)
 
 				Logger.info(account.publicKey.toBase58(), "::", {
 					solBalance: formatSol(solBalance),
 					tokenBalance: formatToken(tokenBalance, this.mint.decimals),
 					isBuy,
-					amount: randUiAmount
+					amount: uiAmount
 				})
 
 				if (isBuy && solBalance < amount) {
