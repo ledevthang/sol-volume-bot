@@ -48,6 +48,8 @@ export class Program {
 		for (;;) {
 			if (buyCount === this.config.consecutive_buys) isBuy = false
 
+			if (sellCount === this.config.consecutive_sells) isBuy = true
+
 			if (
 				buyCount >= this.config.consecutive_buys &&
 				sellCount >= this.config.consecutive_sells
