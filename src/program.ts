@@ -11,6 +11,7 @@ import {
 	bigintPercent,
 	formatSol,
 	formatToken,
+	logError,
 	parseSol,
 	parseToken,
 	random,
@@ -30,14 +31,19 @@ export class Program {
 		let account = this.root
 
 		for (;;) {
-			account = await tryToInsufficient(() => this.executeTrades(account))
+			try {
+				account = await this.executeTrades(account)
+			} catch (error) {
+				logError(error)
+				return
+			}
 		}
 	}
 
 	private async executeTrades(account: web3.Keypair): Promise<web3.Keypair> {
 		let buyCount = 0
 		let sellCount = 0
-		let isBuy = true
+		let isBuy = this.config.start_with_buy
 
 		for (;;) {
 			if (buyCount === this.config.consecutive_buys) isBuy = false
@@ -45,49 +51,61 @@ export class Program {
 			if (
 				buyCount >= this.config.consecutive_buys &&
 				sellCount >= this.config.consecutive_sells
-			)
-				return this.createNewAccountAndTransfer(account)
-
-			const [solBalance, tokenBalance] = await this.balance(account.publicKey)
-
-			Logger.info("balance::", {
-				solBalance: formatSol(solBalance),
-				tokenBalance: formatToken(tokenBalance, this.mint.decimals)
-			})
-
-			const randUiAmount = random(this.config.min_sol, this.config.max_sol)
-
-			const amount = isBuy
-				? parseSol(randUiAmount)
-				: parseToken(randUiAmount, this.mint.decimals)
-
-			if (isBuy && solBalance < amount) {
-				Logger.error(
-					`Insufficient SOL for buy. Required: ${formatSol(amount)}, Available: ${formatSol(solBalance)}`
-				)
-				await sleep(2_000)
-				continue
+			) {
+				const newAccount = await this.createNewAccountAndTransfer(account)
+				return newAccount
 			}
 
-			if (!isBuy && tokenBalance < amount) {
-				Logger.error(
-					`Insufficient tokens for sell. Required: ${formatToken(amount, this.mint.decimals)}, Available: ${formatToken(tokenBalance, this.mint.decimals)}`
-				)
-				await sleep(2_000)
-				continue
-			}
+			const out = await tryToInsufficient(async () => {
+				const [solBalance, tokenBalance] = await this.balance(account.publicKey)
 
-			const outputAmount = await apiSwap(this.connection, {
-				owner: this.root,
-				inputMint: isBuy
-					? spl.NATIVE_MINT.toBase58()
-					: this.mint.address.toBase58(),
-				outputMint: isBuy
-					? this.mint.address.toBase58()
-					: spl.NATIVE_MINT.toBase58(),
-				amountIn: amount,
-				slippage: this.config.slippage
+				const randUiAmount = random(this.config.min_sol, this.config.max_sol)
+
+				const amount = isBuy
+					? parseSol(randUiAmount)
+					: parseToken(randUiAmount, this.mint.decimals)
+
+				Logger.info({
+					solBalance: formatSol(solBalance),
+					tokenBalance: formatToken(tokenBalance, this.mint.decimals),
+					isBuy,
+					amount: randUiAmount
+				})
+
+				if (isBuy && solBalance < amount) {
+					Logger.error(
+						`Insufficient SOL for buy. Required: ${formatSol(amount)}, Available: ${formatSol(solBalance)}`
+					)
+					await sleep(3_000)
+					return
+				}
+
+				if (!isBuy && tokenBalance < amount) {
+					Logger.error(
+						`Insufficient tokens for sell. Required: ${formatToken(amount, this.mint.decimals)}, Available: ${formatToken(tokenBalance, this.mint.decimals)}`
+					)
+					await sleep(3_000)
+					return
+				}
+
+				const outputAmount = await apiSwap(this.connection, {
+					owner: this.root,
+					inputMint: isBuy
+						? spl.NATIVE_MINT.toBase58()
+						: this.mint.address.toBase58(),
+					outputMint: isBuy
+						? this.mint.address.toBase58()
+						: spl.NATIVE_MINT.toBase58(),
+					amountIn: amount,
+					slippage: this.config.slippage
+				})
+
+				return { amount, outputAmount }
 			})
+
+			if (!out) continue
+
+			const { amount, outputAmount } = out
 
 			const message = isBuy
 				? `Buy ${formatToken(BigInt(outputAmount), this.mint.decimals)} tokens @ ${formatSol(BigInt(amount))} SOL`
@@ -169,22 +187,6 @@ export class Program {
 			instructions
 		}).compileToV0Message()
 
-		const fee = await this.connection.getFeeForMessage(message)
-
-		if (fee.value) {
-			const lamportsNeedToTransfer = lamports - BigInt(fee.value)
-
-			instructions.pop()
-
-			instructions.push(
-				web3.SystemProgram.transfer({
-					fromPubkey: sender.publicKey,
-					toPubkey: receiver.publicKey,
-					lamports: lamportsNeedToTransfer
-				})
-			)
-		}
-
 		const transaction = new web3.VersionedTransaction(message)
 
 		transaction.sign([sender])
@@ -224,23 +226,53 @@ export class Program {
 
 		await fs.appendFile("solana-wallets.txt", `\n${encrypted}`)
 
+		Logger.newLine()
+		Logger.info(`created a new account ${account.publicKey.toBase58()}`)
+
 		const [balance, tokenBalance] = await this.balance(
 			previousAccount.publicKey
 		)
 
-		await this.transferSolAndToken(
-			previousAccount,
-			account,
-			bigintPercent(balance, 99),
-			bigintPercent(tokenBalance, 99)
-		)
+		let lamportsToSend = bigintPercent(tokenBalance, 99)
 
-		return account
+		for (;;) {
+			Logger.info("lamportsToSend: ", lamportsToSend)
+			try {
+				await this.transferSolAndToken(
+					previousAccount,
+					account,
+					bigintPercent(balance, 99),
+					lamportsToSend
+				)
+
+				Logger.info("transfered 99% assets to new account")
+				Logger.newLine()
+
+				return account
+			} catch (error: any) {
+				const regex = /Transfer: insufficient lamports (\d+), need (\d+)/
+				const match = (error?.message as string)?.match(regex)
+
+				if (match) {
+					const lamportsAvaiable = BigInt(match[1])
+					const lamportsNeeded = BigInt(match[2])
+
+					Logger.info("lamportsAvaiable: ", lamportsAvaiable)
+					Logger.info("lamportsNeeded: ", lamportsNeeded)
+
+					lamportsToSend -= lamportsNeeded - lamportsAvaiable
+
+					continue
+				}
+
+				throw error
+			}
+		}
 	}
 
 	public async withdraw() {
 		const wallets = await fs
-			.readFile("evm-wallets.txt", "utf8")
+			.readFile("solana-wallets.txt", "utf8")
 			.then(rawLines => rawLines.split("\n"))
 			.then(lines => lines.filter(Boolean))
 			.then(rawWallets => rawWallets.map(decryptWallet))
@@ -309,7 +341,9 @@ export class Program {
 				)
 
 				Logger.info(`withdrawed from ${sender.publicKey.toBase58()}`)
-			} catch {}
+			} catch (error) {
+				Logger.error(error)
+			}
 		}
 	}
 }

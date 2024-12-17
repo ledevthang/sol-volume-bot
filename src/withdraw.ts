@@ -8,7 +8,10 @@ async function main() {
 	const config = parseConfig()
 
 	const connection = new Connection(config.rpc_url, "confirmed")
-	const owner = Keypair.fromSecretKey(bs58.decode(config.private_key))
+
+	const owner = Keypair.fromSecretKey(
+		bs58.decode(process.env.WITHDRAW_ACCOUNT!)
+	)
 
 	const mint = await getMint(connection, config.token_address)
 

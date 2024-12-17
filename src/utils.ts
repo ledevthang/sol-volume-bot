@@ -35,13 +35,6 @@ export function bigintPercent(value: bigint, percent: number) {
 	return (value / 100n) * BigInt(percent)
 }
 
-// The maximum is inclusive and the minimum is inclusive
-export function randomInt(min: number, max: number) {
-	const minCeiled = Math.ceil(min)
-	const maxFloored = Math.floor(max)
-	return Math.floor(Math.random() * (maxFloored - minCeiled + 1) + minCeiled)
-}
-
 // The maximum is exclusive and the minimum is inclusive
 export function random(min: number, max: number) {
 	return Math.random() * (max - min) + min
@@ -55,36 +48,39 @@ export async function tryToInsufficient<T>(
 		retries: "INFINITELY",
 		delay: 5_000,
 		retryIf: error => {
-			if (isAxiosError(error)) {
-				Logger.error(
-					`Http request Error: ${JSON.stringify(
-						{
-							code: error.code,
-							message: error.message,
-							response: error.response?.data
-						},
-						null,
-						1
-					)}`
-				)
-			} else if (error?.message) {
-				Logger.error(
-					`RPC request error: ${JSON.stringify(
-						{
-							name: error?.name,
-							message: error?.message
-						},
-						null,
-						1
-					)}`
-				)
-			} else {
-				Logger.error(error)
-			}
-
+			logError(error)
 			return !isInsufficientError(error)
 		}
 	})
+}
+
+export function logError(error: any) {
+	if (isAxiosError(error)) {
+		Logger.error(
+			`Http request Error: ${JSON.stringify(
+				{
+					code: error.code,
+					message: error.message,
+					response: error.response?.data
+				},
+				null,
+				1
+			)}`
+		)
+	} else if (error?.message) {
+		Logger.error(
+			`RPC request error: ${JSON.stringify(
+				{
+					name: error?.name,
+					message: error?.message
+				},
+				null,
+				1
+			)}`
+		)
+	} else {
+		Logger.error(error)
+	}
 }
 
 function isInsufficientError(error: any) {

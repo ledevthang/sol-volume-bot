@@ -14,4 +14,8 @@ export abstract class Logger {
 			...args
 		)
 	}
+
+	static newLine() {
+		console.log("")
+	}
 }

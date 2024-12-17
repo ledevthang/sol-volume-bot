@@ -19,7 +19,8 @@ const schema = z.object({
 	wait_time_max: positiveNumber(), // in seconds
 
 	min_sol: positiveNumber(),
-	max_sol: positiveNumber()
+	max_sol: positiveNumber(),
+	start_with_buy: z.boolean()
 })
 
 export function parseConfig() {
