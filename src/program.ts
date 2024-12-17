@@ -37,10 +37,9 @@ export class Program {
 	private async executeTrades(account: web3.Keypair): Promise<web3.Keypair> {
 		let buyCount = 0
 		let sellCount = 0
+		let isBuy = true
 
 		for (;;) {
-			let isBuy = true
-
 			if (buyCount === this.config.consecutive_buys) isBuy = false
 
 			if (
