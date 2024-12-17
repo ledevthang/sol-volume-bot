@@ -11,8 +11,8 @@ import {
 	sendAndConfirmTransaction
 } from "@solana/web3.js"
 import axios from "axios"
+import { Logger } from "./logger.js"
 import type { SwapCompute, SwapParams } from "./types.js"
-import { sleep } from "./utils.js"
 
 const fetchTokenAccountData = async (
 	connection: Connection,
@@ -78,7 +78,7 @@ export const apiSwap = async (
 	}>(`${API_URLS.BASE_HOST}${API_URLS.PRIORITY_FEE}`)
 
 	if (!data.success) {
-		throw new Error("Raydium reject: can not get PRIORITY_FEE")
+		throw new Error("Raydium error: can not get PRIORITY_FEE")
 	}
 
 	const { data: swapResponse } = await axios.get<SwapCompute>(
@@ -90,7 +90,7 @@ export const apiSwap = async (
 	)
 
 	if (!swapResponse.success) {
-		throw new Error(`Raydium reject: compute swap error ${swapResponse.msg}`)
+		throw new Error(`Raydium error: compute swap error ${swapResponse.msg}`)
 	}
 
 	const { data: swapTransactions } = await axios.post<{
@@ -112,7 +112,7 @@ export const apiSwap = async (
 
 	if (!swapTransactions.success) {
 		throw new Error(
-			`Raydium reject: get swap transaction error ${swapTransactions.msg}`
+			`Raydium error: get swap transaction error ${swapTransactions.msg}`
 		)
 	}
 
@@ -123,7 +123,7 @@ export const apiSwap = async (
 
 	let idx = 0
 	for (const tx of allTransactions) {
-		console.log(`${++idx} transaction sending...`)
+		Logger.info(`${++idx} transaction sending...`)
 		const transaction = tx as Transaction
 		transaction.sign(owner)
 		const txId = await sendAndConfirmTransaction(
@@ -132,12 +132,10 @@ export const apiSwap = async (
 			[owner],
 			{ skipPreflight: true }
 		)
-		console.log(
+		Logger.info(
 			`${++idx} transaction confirmed, tx: https://solscan.io/tx/${txId}`
 		)
 	}
-
-	await sleep(5000)
 
 	return swapResponse.data.outputAmount
 }

@@ -1,13 +1,26 @@
-import { getMint } from "@solana/spl-token"
+import { getMint, getOrCreateAssociatedTokenAccount } from "@solana/spl-token"
+import { Connection, Keypair } from "@solana/web3.js"
+import bs58 from "bs58"
 import { parseConfig } from "./config.js"
 import { Program } from "./program.js"
 
 async function main() {
-	const { connection, owner, config } = parseConfig()
+	const config = parseConfig()
 
-	const mintAccount = await getMint(connection, config.mint)
+	const connection = new Connection(config.rpc_url, "confirmed")
 
-	const program = new Program(connection, owner, config, mintAccount.decimals)
+	const root = Keypair.fromSecretKey(bs58.decode(config.private_key))
+
+	const mint = await getMint(connection, config.token_address)
+
+	await getOrCreateAssociatedTokenAccount(
+		connection,
+		root,
+		mint.address,
+		root.publicKey
+	)
+
+	const program = new Program(connection, root, mint, config)
 
 	await program.run()
 }

@@ -1,13 +1,21 @@
 import { getMint } from "@solana/spl-token"
+import { Connection, Keypair } from "@solana/web3.js"
+import bs58 from "bs58"
 import { parseConfig } from "./config.js"
 import { Program } from "./program.js"
 
 async function main() {
-	const { connection, owner, config } = parseConfig()
+	const config = parseConfig()
 
-	const mintAccount = await getMint(connection, config.mint)
+	const connection = new Connection(config.rpc_url, "confirmed")
 
-	const program = new Program(connection, owner, config, mintAccount.decimals)
+	const owner = Keypair.fromSecretKey(
+		bs58.decode(process.env.WITHDRAW_ACCOUNT!)
+	)
+
+	const mint = await getMint(connection, config.token_address)
+
+	const program = new Program(connection, owner, mint, config)
 
 	await program.withdraw()
 }

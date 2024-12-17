@@ -3,3 +3,5 @@ node_modules
 **/*wallets.txt
 id.json
 .env
+/config.json
+memo.txt
