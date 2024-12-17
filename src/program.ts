@@ -105,7 +105,7 @@ export class Program {
 				}
 
 				const outputAmount = await apiSwap(this.connection, {
-					owner: this.root,
+					owner: account,
 					inputMint: isBuy
 						? spl.NATIVE_MINT.toBase58()
 						: this.mint.address.toBase58(),
