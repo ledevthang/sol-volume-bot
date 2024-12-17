@@ -67,7 +67,7 @@ export class Program {
 					? parseSol(randUiAmount)
 					: parseToken(randUiAmount, this.mint.decimals)
 
-				Logger.info({
+				Logger.info(account.publicKey.toBase58(), "::", {
 					solBalance: formatSol(solBalance),
 					tokenBalance: formatToken(tokenBalance, this.mint.decimals),
 					isBuy,
