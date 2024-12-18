@@ -30,6 +30,9 @@ export class Program {
 	) {}
 
 	public async run() {
+		Logger.info(`Starting sol volume bot for token ${this.mint.address}...`)
+		Logger.info(`Beginning with wallet: ${this.root.publicKey}`)
+
 		let account = this.root
 
 		for (;;) {
@@ -56,14 +59,13 @@ export class Program {
 				buyCount >= this.config.consecutive_buys &&
 				sellCount >= this.config.consecutive_sells
 			) {
-				const newAccount = await tryToInsufficient(
-					() => this.createNewAccountAndTransfer(account),
-					"transfer assets"
+				const newAccount = await tryToInsufficient("transfer assets", () =>
+					this.createNewAccountAndTransfer(account)
 				)
 				return newAccount
 			}
 
-			const out = await tryToInsufficient(async () => {
+			const out = await tryToInsufficient("swap", async () => {
 				const [solBalance, tokenBalance] = await this.balance(account.publicKey)
 
 				let uiAmount = random(this.config.min_sol, this.config.max_sol)
@@ -120,7 +122,7 @@ export class Program {
 				})
 
 				return { amount, outputAmount }
-			}, "swap")
+			})
 
 			if (!out) continue
 

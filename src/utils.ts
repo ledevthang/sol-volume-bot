@@ -41,8 +41,8 @@ export function random(min: number, max: number) {
 }
 
 export async function tryToInsufficient<T>(
-	thunk: () => Promise<T>,
-	context: string
+	context: string,
+	thunk: () => Promise<T>
 ): Promise<T> {
 	return retry(thunk, {
 		timeout: "INFINITELY",
