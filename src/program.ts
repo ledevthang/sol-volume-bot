@@ -4,7 +4,7 @@ import * as web3 from "@solana/web3.js"
 import bs58 from "bs58"
 import { Decimal } from "decimal.js"
 import { DateTime } from "luxon"
-import type { Config } from "./config.js"
+import { type Config, encryptedFilePath } from "./config.js"
 import { decryptWallet, encryptWallet } from "./hashing.js"
 import { Logger } from "./logger.js"
 import { getPrice } from "./services.js"
@@ -245,7 +245,7 @@ export class Program {
 			createdAt: DateTime.now()
 		})
 
-		await fs.appendFile("solana-wallets.txt", `\n${encrypted}`)
+		await fs.appendFile(encryptedFilePath, `\n${encrypted}`)
 
 		Logger.newLine()
 		Logger.info(`created a new account ${account.publicKey.toBase58()}`)
@@ -291,7 +291,7 @@ export class Program {
 
 	public async withdraw() {
 		const wallets = await fs
-			.readFile("solana-wallets.txt", "utf8")
+			.readFile(encryptedFilePath, "utf8")
 			.then(rawLines => rawLines.split("\n"))
 			.then(lines => lines.filter(Boolean))
 			.then(rawWallets => rawWallets.map(decryptWallet))

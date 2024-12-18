@@ -1,8 +1,18 @@
 import fs from "node:fs"
+import path from "node:path"
 import { z } from "zod"
 import { notEmptyStr, positiveNumber, pubkey } from "./parser.js"
 
 export type Config = z.infer<typeof schema>
+
+const processDir = process.cwd()
+
+export const encryptedFilePath = path.resolve(processDir, "solana-wallets.txt")
+
+export const decryptedFilePath = path.resolve(
+	processDir,
+	"solana-decoded-wallets.txt"
+)
 
 const schema = z.object({
 	private_key: notEmptyStr(),
@@ -24,8 +34,10 @@ const schema = z.object({
 })
 
 export function parseConfig() {
+	const configFilePath = path.resolve(import.meta.dirname, "config.json")
+
 	const config = schema.parse(
-		JSON.parse(fs.readFileSync("config.json", "utf-8"))
+		JSON.parse(fs.readFileSync(configFilePath, "utf-8"))
 	)
 
 	return config
