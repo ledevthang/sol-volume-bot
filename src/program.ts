@@ -4,7 +4,7 @@ import * as web3 from "@solana/web3.js"
 import bs58 from "bs58"
 import { Decimal } from "decimal.js"
 import { DateTime } from "luxon"
-import type { Config } from "./config.js"
+import { type Config, encryptedFilePath } from "./config.js"
 import { decryptWallet, encryptWallet } from "./hashing.js"
 import { Logger } from "./logger.js"
 import { getPrice } from "./services.js"
@@ -32,6 +32,7 @@ export class Program {
 	public async run() {
 		Logger.info(`Starting sol volume bot for token ${this.mint.address}...`)
 		Logger.info(`Beginning with wallet: ${this.root.publicKey}`)
+		Logger.newLine()
 
 		let account = this.root
 
@@ -140,6 +141,9 @@ export class Program {
 			const restTime =
 				random(this.config.wait_time_min, this.config.wait_time_max) * 1000
 
+			Logger.info("Sleeping...before next order")
+			Logger.newLine()
+
 			await sleep(restTime)
 		}
 	}
@@ -245,10 +249,10 @@ export class Program {
 			createdAt: DateTime.now()
 		})
 
-		await fs.appendFile("solana-wallets.txt", `\n${encrypted}`)
+		await fs.appendFile(encryptedFilePath, `\n${encrypted}`)
 
 		Logger.newLine()
-		Logger.info(`created a new account ${account.publicKey.toBase58()}`)
+		Logger.info(`Created a new account ${account.publicKey.toBase58()}`)
 
 		const [balance, tokenBalance] = await this.balance(
 			previousAccount.publicKey
@@ -257,7 +261,7 @@ export class Program {
 		let lamportsToSend = bigintPercent(balance, 99)
 
 		for (;;) {
-			Logger.info("lamportsToSend: ", lamportsToSend)
+			Logger.info("LamportsToSend: ", lamportsToSend)
 
 			try {
 				await this.transferSolAndToken(
@@ -267,7 +271,7 @@ export class Program {
 					bigintPercent(tokenBalance, 99)
 				)
 
-				Logger.info("transfered 99% assets to new account")
+				Logger.info("Transfered 99% assets to new account")
 				Logger.newLine()
 
 				return account
@@ -291,7 +295,7 @@ export class Program {
 
 	public async withdraw() {
 		const wallets = await fs
-			.readFile("solana-wallets.txt", "utf8")
+			.readFile(encryptedFilePath, "utf8")
 			.then(rawLines => rawLines.split("\n"))
 			.then(lines => lines.filter(Boolean))
 			.then(rawWallets => rawWallets.map(decryptWallet))
@@ -359,7 +363,7 @@ export class Program {
 					"confirmed"
 				)
 
-				Logger.info(`withdrawed from ${sender.publicKey.toBase58()}`)
+				Logger.info(`Withdrawed from ${sender.publicKey.toBase58()}`)
 			} catch (error) {
 				logError(error)
 			}
