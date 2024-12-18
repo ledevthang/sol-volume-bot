@@ -8,5 +8,6 @@
 	"wait_time_min": 2,
 	"wait_time_max": 4,
 	"min_sol": 0.01,
-	"max_sol": 0.04
+	"max_sol": 0.04,
+	"start_with_buy": true
 }
