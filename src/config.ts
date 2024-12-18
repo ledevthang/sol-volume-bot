@@ -34,7 +34,9 @@ const schema = z.object({
 })
 
 export function parseConfig() {
-	const configFilePath = path.resolve(import.meta.dirname, "config.json")
+	const configFilePath = path
+		.resolve(import.meta.dirname, "config.json")
+		.replace("/dist", "")
 
 	const config = schema.parse(
 		JSON.parse(fs.readFileSync(configFilePath, "utf-8"))
