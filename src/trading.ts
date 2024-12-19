@@ -80,12 +80,6 @@ export const apiSwap = async (
 		throw new Error("insufficient tokens")
 	}
 
-	// get statistical transaction fee from api
-	/**
-	 * vh: very high
-	 * h: high
-	 * m: medium
-	 */
 	const { data: priority } = await axios.get<Priority>(
 		`${API_URLS.BASE_HOST}${API_URLS.PRIORITY_FEE}`
 	)

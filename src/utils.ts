@@ -92,7 +92,5 @@ function isInsufficientError(error: any) {
 
 	if (error?.message?.includes("insufficient funds")) return true
 
-	if (error?.message?.includes("Raydium error")) return true
-
 	return false
 }
