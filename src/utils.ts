@@ -50,7 +50,7 @@ export async function tryToInsufficient<T>(
 		delay: 5_000,
 		retryIf: error => {
 			logError(error)
-			Logger.info(`retrying ${context}...`)
+			Logger.info(`Retrying ${context}...`)
 			return !isInsufficientError(error)
 		}
 	})
