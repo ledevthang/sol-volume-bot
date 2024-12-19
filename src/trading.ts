@@ -8,11 +8,26 @@ import {
 	type Connection,
 	type Keypair,
 	Transaction,
-	sendAndConfirmTransaction
+	TransactionMessage,
+	VersionedTransaction
 } from "@solana/web3.js"
 import axios from "axios"
 import { Logger } from "./logger.js"
 import type { SwapCompute, SwapParams } from "./types.js"
+
+type Priority = {
+	id: string
+	success: boolean
+	data: { default: { vh: number; h: number; m: number } }
+}
+
+type SwapTxResponse = {
+	id: string
+	version: string
+	success: boolean
+	msg?: string
+	data: { transaction: string }[]
+}
 
 const fetchTokenAccountData = async (
 	connection: Connection,
@@ -71,13 +86,11 @@ export const apiSwap = async (
 	 * h: high
 	 * m: medium
 	 */
-	const { data } = await axios.get<{
-		id: string
-		success: boolean
-		data: { default: { vh: number; h: number; m: number } }
-	}>(`${API_URLS.BASE_HOST}${API_URLS.PRIORITY_FEE}`)
+	const { data: priority } = await axios.get<Priority>(
+		`${API_URLS.BASE_HOST}${API_URLS.PRIORITY_FEE}`
+	)
 
-	if (!data.success) {
+	if (!priority.success) {
 		throw new Error("Raydium error: can not get PRIORITY_FEE")
 	}
 
@@ -93,22 +106,19 @@ export const apiSwap = async (
 		throw new Error(`Raydium error: compute swap error ${swapResponse.msg}`)
 	}
 
-	const { data: swapTransactions } = await axios.post<{
-		id: string
-		version: string
-		success: boolean
-		msg?: string
-		data: { transaction: string }[]
-	}>(`${API_URLS.SWAP_HOST}/transaction/swap-base-in`, {
-		computeUnitPriceMicroLamports: String(data.data.default.h),
-		swapResponse,
-		txVersion,
-		wallet: owner.publicKey.toBase58(),
-		wrapSol: isInputSol,
-		unwrapSol: isOutputSol, // true means output mint receive sol, false means output mint received wsol
-		inputAccount: isInputSol ? undefined : inputTokenAcc?.toBase58(),
-		outputAccount: isOutputSol ? undefined : outputTokenAcc?.toBase58()
-	})
+	const { data: swapTransactions } = await axios.post<SwapTxResponse>(
+		`${API_URLS.SWAP_HOST}/transaction/swap-base-in`,
+		{
+			computeUnitPriceMicroLamports: String(priority.data.default.h),
+			swapResponse,
+			txVersion,
+			wallet: owner.publicKey.toBase58(),
+			wrapSol: isInputSol,
+			unwrapSol: isOutputSol, // true means output mint receive sol, false means output mint received wsol
+			inputAccount: isInputSol ? undefined : inputTokenAcc?.toBase58(),
+			outputAccount: isOutputSol ? undefined : outputTokenAcc?.toBase58()
+		}
+	)
 
 	if (!swapTransactions.success) {
 		throw new Error(
@@ -121,21 +131,49 @@ export const apiSwap = async (
 	)
 	const allTransactions = allTxBuf.map(txBuf => Transaction.from(txBuf))
 
-	let idx = 0
+	const instructions = []
+
 	for (const tx of allTransactions) {
-		Logger.info(`${++idx} transaction sending...`)
-		const transaction = tx as Transaction
-		transaction.sign(owner)
-		const txId = await sendAndConfirmTransaction(
-			connection,
-			transaction,
-			[owner],
-			{ skipPreflight: true }
-		)
-		Logger.info(
-			`${++idx} transaction confirmed, tx: https://solscan.io/tx/${txId}`
+		instructions.push(...tx.instructions)
+	}
+
+	const block = await connection.getLatestBlockhash()
+
+	const message = new TransactionMessage({
+		instructions,
+		payerKey: owner.publicKey,
+		recentBlockhash: block.blockhash
+	}).compileToV0Message()
+
+	const transaction = new VersionedTransaction(message)
+
+	transaction.sign([owner])
+
+	const simulateResponse = await connection.simulateTransaction(transaction)
+
+	if (simulateResponse.value.err) {
+		throw new Error(
+			`Simulate tx error: ${JSON.stringify(simulateResponse.value.err)}`
 		)
 	}
+
+	const signature = await connection.sendTransaction(transaction)
+
+	const result = await connection.confirmTransaction(
+		{
+			blockhash: block.blockhash,
+			lastValidBlockHeight: block.lastValidBlockHeight,
+			signature
+		},
+		"confirmed"
+	)
+
+	if (result.value.err)
+		throw new Error(
+			`Can not confirm transaction: ${result.value.err.toString()}`
+		)
+
+	Logger.info(`Confirmed transaction, tx: https://solscan.io/tx/${signature}`)
 
 	return swapResponse.data.outputAmount
 }
