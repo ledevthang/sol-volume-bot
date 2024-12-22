@@ -17,134 +17,143 @@ import {
 	parseSol,
 	parseToken,
 	random,
-	sleep,
-	tryToInsufficient
+	sleep
 } from "./utils.js"
 
 export class Program {
+	private num_sells: number
+	private num_buys: number
+	private is_buy: boolean
+	private current_account: web3.Keypair
+
 	constructor(
 		private connection: web3.Connection,
 		private root: web3.Keypair,
 		private mint: spl.Mint,
 		private config: Config
-	) {}
+	) {
+		this.num_sells = 0
+		this.num_buys = 0
+		this.is_buy = config.start_with_buy
+		this.current_account = root
+	}
 
 	public async run() {
 		Logger.info(`Starting sol volume bot for token ${this.mint.address}...`)
 		Logger.info(`Beginning with wallet: ${this.root.publicKey}`)
 		Logger.newLine()
 
-		let account = this.root
-
 		for (;;) {
 			try {
-				account = await this.executeTrades(account)
+				await this.exeCycle()
+
+				const restTime =
+					random(this.config.wait_time_min, this.config.wait_time_max) * 1000
+
+				Logger.info("Sleeping...before next order")
+				Logger.newLine()
+
+				await sleep(restTime)
 			} catch (error) {
 				logError(error)
-				return
+
+				Logger.info("Retrying ...")
+				Logger.newLine()
+
+				await sleep(3000)
 			}
 		}
 	}
 
-	private async executeTrades(account: web3.Keypair): Promise<web3.Keypair> {
-		let buyCount = 0
-		let sellCount = 0
-		let isBuy = this.config.start_with_buy
-
+	private async exeCycle() {
 		for (;;) {
-			if (buyCount === this.config.consecutive_buys) isBuy = false
+			if (this.num_buys === this.config.consecutive_buys) this.is_buy = false
 
-			if (sellCount === this.config.consecutive_sells) isBuy = true
+			if (this.num_sells === this.config.consecutive_sells) this.is_buy = true
 
 			if (
-				buyCount >= this.config.consecutive_buys &&
-				sellCount >= this.config.consecutive_sells
+				this.num_buys >= this.config.consecutive_buys &&
+				this.num_sells >= this.config.consecutive_sells
 			) {
-				const newAccount = await tryToInsufficient("transfer assets", () =>
-					this.createNewAccountAndTransfer(account)
+				await this.createNewAccountThenTransferAndSwitchToIt()
+
+				Logger.info(
+					`Switching to account ${this.current_account.publicKey.toBase58()}...`
 				)
-				return newAccount
+				Logger.newLine()
+
+				await sleep(3000)
+
+				continue
 			}
 
-			const out = await tryToInsufficient("swap", async () => {
-				const [solBalance, tokenBalance] = await this.balance(account.publicKey)
+			const [solBalance, tokenBalance] = await this.balance(
+				this.current_account.publicKey
+			)
 
-				let uiAmount = random(this.config.min_sol, this.config.max_sol)
+			let uiAmount = random(this.config.min_sol, this.config.max_sol)
 
-				if (!isBuy) {
-					const price = await getPrice([spl.NATIVE_MINT, this.mint.address])
+			if (!this.is_buy) {
+				const price = await getPrice([spl.NATIVE_MINT, this.mint.address])
 
-					const solPriceInUsd = new Decimal(price[spl.NATIVE_MINT.toBase58()])
+				const solPriceInUsd = new Decimal(price[spl.NATIVE_MINT.toBase58()])
 
-					const tokenPriceInUsd = new Decimal(
-						price[this.mint.address.toBase58()]
-					)
+				const tokenPriceInUsd = new Decimal(price[this.mint.address.toBase58()])
 
-					uiAmount = solPriceInUsd.div(tokenPriceInUsd).mul(uiAmount).toNumber()
-				}
+				uiAmount = solPriceInUsd.div(tokenPriceInUsd).mul(uiAmount).toNumber()
+			}
 
-				const amount = isBuy
-					? parseSol(uiAmount)
-					: parseToken(uiAmount, this.mint.decimals)
+			const amount = this.is_buy
+				? parseSol(uiAmount)
+				: parseToken(uiAmount, this.mint.decimals)
 
-				Logger.info(account.publicKey.toBase58(), "::", {
-					solBalance: formatSol(solBalance),
-					tokenBalance: formatToken(tokenBalance, this.mint.decimals),
-					isBuy,
-					amount: uiAmount
-				})
-
-				if (isBuy && solBalance < amount) {
-					Logger.error(
-						`Insufficient SOL for buy. Required: ${formatSol(amount)}, Available: ${formatSol(solBalance)}`
-					)
-					await sleep(3_000)
-					return
-				}
-
-				if (!isBuy && tokenBalance < amount) {
-					Logger.error(
-						`Insufficient tokens for sell. Required: ${formatToken(amount, this.mint.decimals)}, Available: ${formatToken(tokenBalance, this.mint.decimals)}`
-					)
-					await sleep(3_000)
-					return
-				}
-
-				const outputAmount = await apiSwap(this.connection, {
-					owner: account,
-					inputMint: isBuy
-						? spl.NATIVE_MINT.toBase58()
-						: this.mint.address.toBase58(),
-					outputMint: isBuy
-						? this.mint.address.toBase58()
-						: spl.NATIVE_MINT.toBase58(),
-					amountIn: amount,
-					slippage: this.config.slippage
-				})
-
-				return { amount, outputAmount }
+			Logger.info(this.current_account.publicKey.toBase58(), "::", {
+				solBalance: formatSol(solBalance),
+				tokenBalance: formatToken(tokenBalance, this.mint.decimals),
+				is_buy: this.is_buy,
+				amount: uiAmount
 			})
 
-			if (!out) continue
+			if (this.is_buy && solBalance < amount) {
+				Logger.error(
+					`Insufficient SOL for buy. Required: ${formatSol(amount)}, Available: ${formatSol(solBalance)}`
+				)
+				Logger.newLine()
 
-			const { amount, outputAmount } = out
+				await sleep(3_000)
+				continue
+			}
 
-			const message = isBuy
+			if (!this.is_buy && tokenBalance < amount) {
+				Logger.error(
+					`Insufficient tokens for sell. Required: ${formatToken(amount, this.mint.decimals)}, Available: ${formatToken(tokenBalance, this.mint.decimals)}`
+				)
+				Logger.newLine()
+
+				await sleep(3_000)
+				continue
+			}
+
+			const outputAmount = await apiSwap(this.connection, {
+				owner: this.current_account,
+				inputMint: this.is_buy
+					? spl.NATIVE_MINT.toBase58()
+					: this.mint.address.toBase58(),
+				outputMint: this.is_buy
+					? this.mint.address.toBase58()
+					: spl.NATIVE_MINT.toBase58(),
+				amountIn: amount,
+				slippage: this.config.slippage
+			})
+
+			const message = this.is_buy
 				? `Buy ${formatToken(BigInt(outputAmount), this.mint.decimals)} tokens @ ${formatSol(BigInt(amount))} SOL`
 				: `Sell ${formatToken(amount, this.mint.decimals)} tokens @ ${formatSol(BigInt(outputAmount))} SOL`
 
 			Logger.info(message)
 
-			if (isBuy) buyCount++
-			else sellCount++
-
-			const restTime =
-				random(this.config.wait_time_min, this.config.wait_time_max) * 1000
-
-			Logger.info("Sleeping...before next order")
-			Logger.newLine()
-
-			await sleep(restTime)
+			if (this.is_buy) this.num_buys++
+			else this.num_sells++
 		}
 	}
 
@@ -228,6 +237,13 @@ export class Program {
 		)
 	}
 
+	private switchToNewAccount(account: web3.Keypair) {
+		this.num_sells = 0
+		this.num_buys = 0
+		this.is_buy = this.config.start_with_buy
+		this.current_account = account
+	}
+
 	private async balance(pubkey: web3.PublicKey) {
 		const balance = await this.connection.getBalance(pubkey)
 
@@ -241,7 +257,7 @@ export class Program {
 		return [BigInt(balance), ataAccount.amount]
 	}
 
-	private async createNewAccountAndTransfer(previousAccount: web3.Keypair) {
+	private async createNewAccountThenTransferAndSwitchToIt() {
 		const account = web3.Keypair.generate()
 
 		const encrypted = encryptWallet({
@@ -255,17 +271,15 @@ export class Program {
 		Logger.info(`Created a new account ${account.publicKey.toBase58()}`)
 
 		const [balance, tokenBalance] = await this.balance(
-			previousAccount.publicKey
+			this.current_account.publicKey
 		)
 
 		let lamportsToSend = bigintPercent(balance, 99)
 
 		for (;;) {
-			Logger.info("LamportsToSend: ", lamportsToSend)
-
 			try {
 				await this.transferSolAndToken(
-					previousAccount,
+					this.current_account,
 					account,
 					lamportsToSend,
 					bigintPercent(tokenBalance, 99)
@@ -274,7 +288,8 @@ export class Program {
 				Logger.info("Transfered 99% assets to new account")
 				Logger.newLine()
 
-				return account
+				this.switchToNewAccount(account)
+				return
 			} catch (error: any) {
 				const regex = /Transfer: insufficient lamports (\d+), need (\d+)/
 				const match = (error?.message as string)?.match(regex)

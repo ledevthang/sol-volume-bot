@@ -1,7 +1,6 @@
 import * as web3 from "@solana/web3.js"
 import { isAxiosError } from "axios"
 import { Decimal } from "decimal.js"
-import { retry } from "ts-retry-promise"
 import { Logger } from "./logger.js"
 
 export function sleep(duration: number) {
@@ -40,22 +39,6 @@ export function random(min: number, max: number) {
 	return Math.random() * (max - min) + min
 }
 
-export async function tryToInsufficient<T>(
-	context: string,
-	thunk: () => Promise<T>
-): Promise<T> {
-	return retry(thunk, {
-		timeout: "INFINITELY",
-		retries: "INFINITELY",
-		delay: 5_000,
-		retryIf: error => {
-			logError(error)
-			Logger.info(`Retrying ${context}...`)
-			return !isInsufficientError(error)
-		}
-	})
-}
-
 export function logError(error: any) {
 	if (isAxiosError(error)) {
 		Logger.error(
@@ -85,12 +68,12 @@ export function logError(error: any) {
 	}
 }
 
-function isInsufficientError(error: any) {
-	if (error?.message?.includes("insufficient lamports")) return true
+// function isInsufficientError(error: any) {
+// 	if (error?.message?.includes("insufficient lamports")) return true
 
-	if (error?.message?.includes("insufficient tokens")) return true
+// 	if (error?.message?.includes("insufficient tokens")) return true
 
-	if (error?.message?.includes("insufficient funds")) return true
+// 	if (error?.message?.includes("insufficient funds")) return true
 
-	return false
-}
+// 	return false
+// }
