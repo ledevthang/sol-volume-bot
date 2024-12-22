@@ -48,14 +48,6 @@ export class Program {
 		for (;;) {
 			try {
 				await this.exeCycle()
-
-				const restTime =
-					random(this.config.wait_time_min, this.config.wait_time_max) * 1000
-
-				Logger.info("Sleeping...before next order")
-				Logger.newLine()
-
-				await sleep(restTime)
 			} catch (error) {
 				logError(error)
 
@@ -156,6 +148,14 @@ export class Program {
 
 			if (this.is_buy) this.num_buys++
 			else this.num_sells++
+
+			const restTime =
+				random(this.config.wait_time_min, this.config.wait_time_max) * 1000
+
+			Logger.info("Sleeping...before next order")
+			Logger.newLine()
+
+			await sleep(restTime)
 		}
 	}
 
@@ -288,7 +288,6 @@ export class Program {
 				)
 
 				Logger.info("Transfered 99% assets to new account")
-				Logger.newLine()
 
 				this.switchToNewAccount(account)
 				return
