@@ -39,7 +39,7 @@ export class Program {
 	}
 
 	public async run() {
-		Logger.info(`Starting... sol volume bot for token ${this.mint.address}...`)
+		Logger.info(`Starting sol volume bot for token ${this.mint.address}...`)
 		Logger.info(
 			`Begin with wallet: ${this.current_account.publicKey.toBase58()}`
 		)
@@ -51,7 +51,7 @@ export class Program {
 			} catch (error) {
 				logError(error)
 
-				Logger.info("Retrying ...")
+				Logger.info("Retrying...")
 				Logger.newLine()
 
 				await sleep(3000)
@@ -77,7 +77,7 @@ export class Program {
 				this.current_account = account
 
 				Logger.info(
-					`Switching... to account ${this.current_account.publicKey.toBase58()}...`
+					`Switching to account ${this.current_account.publicKey.toBase58()}...`
 				)
 				Logger.newLine()
 
@@ -132,8 +132,8 @@ export class Program {
 			}
 
 			const preExecuteMessage = this.is_buy
-				? `Executing... buy tokens with ${uiAmount} sols`
-				: `Executing... sell ${uiAmount} tokens`
+				? `Executing buy tokens with ${uiAmount} sols...`
+				: `Executing sell ${uiAmount} tokens...`
 
 			Logger.info(preExecuteMessage)
 
@@ -161,7 +161,7 @@ export class Program {
 			const restTime =
 				random(this.config.wait_time_min, this.config.wait_time_max) * 1000
 
-			Logger.info("Sleeping...before next order")
+			Logger.info("Sleeping before next order...")
 			Logger.newLine()
 
 			await sleep(restTime)
@@ -296,7 +296,7 @@ export class Program {
 		let lamportsToSend = bigintPercent(balance, 99)
 
 		Logger.info(
-			`Transfering... tokens and sol to ${account.publicKey.toBase58()}`
+			`Transfering tokens and sol to ${account.publicKey.toBase58()}...`
 		)
 		for (;;) {
 			try {
