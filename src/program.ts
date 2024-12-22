@@ -39,9 +39,9 @@ export class Program {
 	}
 
 	public async run() {
-		Logger.info(`Starting sol volume bot for token ${this.mint.address}...`)
+		Logger.info(`Starting... sol volume bot for token ${this.mint.address}...`)
 		Logger.info(
-			`Beginning with wallet: ${this.current_account.publicKey.toBase58()}`
+			`Begin with wallet: ${this.current_account.publicKey.toBase58()}`
 		)
 		Logger.newLine()
 
@@ -77,7 +77,7 @@ export class Program {
 				this.current_account = account
 
 				Logger.info(
-					`Switching to account ${this.current_account.publicKey.toBase58()}...`
+					`Switching... to account ${this.current_account.publicKey.toBase58()}...`
 				)
 				Logger.newLine()
 
@@ -108,9 +108,7 @@ export class Program {
 
 			Logger.info(this.current_account.publicKey.toBase58(), "::", {
 				solBalance: formatSol(solBalance),
-				tokenBalance: formatToken(tokenBalance, this.mint.decimals),
-				is_buy: this.is_buy,
-				amount: uiAmount
+				tokenBalance: formatToken(tokenBalance, this.mint.decimals)
 			})
 
 			if (this.is_buy && solBalance < amount) {
@@ -132,6 +130,12 @@ export class Program {
 				await sleep(3_000)
 				continue
 			}
+
+			const preExecuteMessage = this.is_buy
+				? `Executing... buy tokens with ${uiAmount} sols`
+				: `Executing... sell ${uiAmount} tokens`
+
+			Logger.info(preExecuteMessage)
 
 			const outputAmount = await apiSwap(this.connection, {
 				owner: this.current_account,
@@ -232,9 +236,18 @@ export class Program {
 
 		transaction.sign([sender])
 
+		const simulateResponse =
+			await this.connection.simulateTransaction(transaction)
+
+		if (simulateResponse.value.err) {
+			throw new Error(
+				`Simulate transfer assets transaction error: ${JSON.stringify(simulateResponse.value.logs)}, Logs: ${JSON.stringify(simulateResponse.value.logs)}`
+			)
+		}
+
 		const signature = await this.connection.sendTransaction(transaction)
 
-		await this.connection.confirmTransaction(
+		const result = await this.connection.confirmTransaction(
 			{
 				blockhash,
 				lastValidBlockHeight,
@@ -242,6 +255,12 @@ export class Program {
 			},
 			"confirmed"
 		)
+
+		if (result.value.err) {
+			throw new Error(
+				`Can not confirm transfer assets transaction: ${JSON.stringify(simulateResponse.value.err)}, Logs: ${JSON.stringify(simulateResponse.value.logs)}`
+			)
+		}
 	}
 
 	private async balance(pubkey: web3.PublicKey) {
@@ -276,6 +295,9 @@ export class Program {
 
 		let lamportsToSend = bigintPercent(balance, 99)
 
+		Logger.info(
+			`Transfering... tokens and sol to ${account.publicKey.toBase58()}`
+		)
 		for (;;) {
 			try {
 				await this.transferSolAndToken(
