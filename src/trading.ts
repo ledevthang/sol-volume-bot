@@ -164,7 +164,7 @@ export const apiSwap = async (
 
 	if (result.value.err)
 		throw new Error(
-			`Can not confirm transaction: ${result.value.err.toString()}`
+			`Can not confirm transaction: ${JSON.stringify(simulateResponse.value.err)}`
 		)
 
 	Logger.info(`Confirmed transaction, tx: https://solscan.io/tx/${signature}`)
