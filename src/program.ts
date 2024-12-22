@@ -40,7 +40,9 @@ export class Program {
 
 	public async run() {
 		Logger.info(`Starting sol volume bot for token ${this.mint.address}...`)
-		Logger.info(`Beginning with wallet: ${this.root.publicKey}`)
+		Logger.info(
+			`Beginning with wallet: ${this.current_account.publicKey.toBase58()}`
+		)
 		Logger.newLine()
 
 		for (;;) {
