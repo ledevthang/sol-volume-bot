@@ -47,7 +47,7 @@ export class Program {
 
 		for (;;) {
 			try {
-				await this.exeCycle()
+				await this.unsafeRun()
 			} catch (error) {
 				logError(error)
 
@@ -59,7 +59,7 @@ export class Program {
 		}
 	}
 
-	private async exeCycle() {
+	private async unsafeRun() {
 		for (;;) {
 			if (this.num_buys === this.config.consecutive_buys) this.is_buy = false
 
@@ -69,7 +69,12 @@ export class Program {
 				this.num_buys >= this.config.consecutive_buys &&
 				this.num_sells >= this.config.consecutive_sells
 			) {
-				await this.createNewAccountThenTransferAndSwitchToIt()
+				const account = await this.createNewAccountThenTransfer()
+
+				this.num_sells = 0
+				this.num_buys = 0
+				this.is_buy = this.config.start_with_buy
+				this.current_account = account
 
 				Logger.info(
 					`Switching to account ${this.current_account.publicKey.toBase58()}...`
@@ -239,13 +244,6 @@ export class Program {
 		)
 	}
 
-	private switchToNewAccount(account: web3.Keypair) {
-		this.num_sells = 0
-		this.num_buys = 0
-		this.is_buy = this.config.start_with_buy
-		this.current_account = account
-	}
-
 	private async balance(pubkey: web3.PublicKey) {
 		const balance = await this.connection.getBalance(pubkey)
 
@@ -259,7 +257,7 @@ export class Program {
 		return [BigInt(balance), ataAccount.amount]
 	}
 
-	private async createNewAccountThenTransferAndSwitchToIt() {
+	private async createNewAccountThenTransfer(): Promise<web3.Keypair> {
 		const account = web3.Keypair.generate()
 
 		const encrypted = encryptWallet({
@@ -289,8 +287,7 @@ export class Program {
 
 				Logger.info("Transfered 99% assets to new account")
 
-				this.switchToNewAccount(account)
-				return
+				return account
 			} catch (error: any) {
 				const regex = /Transfer: insufficient lamports (\d+), need (\d+)/
 				const match = (error?.message as string)?.match(regex)
